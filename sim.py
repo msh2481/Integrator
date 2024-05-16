@@ -45,7 +45,10 @@ def parse_program(
 
         if init_section:
             var, value = line.split(":")
-            init_values[var.strip()] = float(value.strip())
+            var = var.strip()
+            init_values[var] = float(value.strip())
+            if var not in diff_eqs:
+                diff_eqs[var] = "0.0"
         elif diff_section:
             var, eq = line.split(":")
             diff_eqs[var.strip()] = eq.strip()
@@ -128,6 +131,7 @@ def compile_program(
     Callable[[Float[Array, ""], Float[Array, "n"]], Float[Array, "n"]],
 ]:
     args, init_values, diff_eqs = parse_program(program)
+    assert set(init_values.keys()) == set(diff_eqs.keys())
     variables = list(init_values.keys())
     get_x0 = generate_get_x0(init_values)
     get_dxdt = generate_get_dxdt(diff_eqs, init_values)
