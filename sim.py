@@ -2,10 +2,13 @@ import re
 import time
 
 import jax.numpy as jnp
+import numpy as np
+import pandas as pd
 from beartype import beartype as typed
 from beartype.typing import Any, Callable
 from jax import Array, jit, make_jaxpr
-from jaxtyping import Array, Float, Int
+from jaxtyping import Float, Int
+from numpy import ndarray as ND
 
 
 @typed
@@ -30,9 +33,7 @@ def parse_program(
             init_section = False
             diff_section = True
             continue
-        elif any(line.startswith(key + ":") for key in ["T0", "DT", "METHOD"]):
-            init_section = False
-            diff_section = False
+        elif any(line.startswith(key + ":") for key in ["T0", "T1", "DT", "METHOD"]):
             args[line.split(":")[0].strip()] = line.split(":")[1].strip()
         elif not line:
             continue
@@ -48,18 +49,18 @@ def parse_program(
 
 
 @typed
-def generate_get_x0(init_values: dict[str, float]) -> Callable[[], Float[Array, "n"]]:
+def generate_get_x0(init_values: dict[str, float]) -> Callable[[], Float[ND, "n"]]:
     @typed
-    def get_x0() -> Float[Array, "n"]:
-        return jnp.array(list(init_values.values()))
+    def get_x0() -> Float[ND, "n"]:
+        return np.array(list(init_values.values()))
 
-    return jit(get_x0)
+    return get_x0
 
 
 @typed
 def generate_get_dxdt(
     diff_eqs: dict[str, str], init_values: dict[str, float]
-) -> Callable[[float, Float[Array, "n"]], Float[Array, "n"]]:
+) -> Callable[[Float[Array, ""], Float[Array, "n"]], Float[Array, "n"]]:
     variables = list(init_values.keys())
     var_to_idx = {var: idx for idx, var in enumerate(variables)}
 
@@ -93,8 +94,7 @@ def generate_get_dxdt(
         "pi": jnp.pi,
     }
 
-    @typed
-    def get_dxdt(t: Float[Array, ""], x: Float[Array, "n"]) -> Float[Array, "n"]:
+    def jax_dxdt(t: Float[Array, ""], x: Float[Array, "n"]) -> Float[Array, "n"]:
         dxdt = []
         for var in variables:
             derivative = 0.0
@@ -105,7 +105,7 @@ def generate_get_dxdt(
             dxdt.append(derivative)
         return jnp.array(dxdt)
 
-    return jit(get_dxdt)
+    return jit(jax_dxdt)
 
 
 @typed
@@ -113,88 +113,75 @@ def compile_program(
     program: str,
 ) -> tuple[
     dict[str, Any],
-    Callable[[], Float[Array, "n"]],
-    Callable[[float, Float[Array, "n"]], Float[Array, "n"]],
+    list[str],
+    Callable[[], Float[ND, "n"]],
+    Callable[[Float[Array, ""], Float[Array, "n"]], Float[Array, "n"]],
 ]:
     args, init_values, diff_eqs = parse_program(program)
+    variables = list(init_values.keys())
     get_x0 = generate_get_x0(init_values)
     get_dxdt = generate_get_dxdt(diff_eqs, init_values)
-    return args, get_x0, get_dxdt
+    return args, variables, get_x0, get_dxdt
 
 
 @typed
 def simulate(
     args: dict[str, Any],
-    get_x0: Callable[[], Float[Array, "n"]],
-    get_dxdt_core: Callable[[float, Float[Array, "n"]], Float[Array, "n"]],
-) -> tuple[Float[Array, "periods"], Float[Array, "periods n"]]:
-    t0 = args["T0"]
-    t1 = args["T1"]
-    assert isinstance(t0, float) and isinstance(t1, float)
+    get_x0: Callable[[], Float[ND, "n"]],
+    get_dxdt_core: Callable[[Float[Array, ""], Float[Array, "n"]], Float[Array, "n"]],
+) -> tuple[Float[ND, "periods"], Float[ND, "periods n"]]:
+    t0 = float(args["T0"])
+    t1 = float(args["T1"])
     assert t0 < t1
-    dt = args["DT"]
-    assert isinstance(dt, float) and dt > 0
+    dt = float(args["DT"])
+    assert dt > 0
     method = args["METHOD"]
     assert method in ["Euler", "Heun"]
 
-    h_list: list[Float[Array, "n"]] = [get_x0()]
-    t_list: list[float] = [t0]
+    periods = jnp.arange(t0, t1, dt)
+    h = np.zeros((len(periods), len(get_x0())))
+    h[0] = get_x0()
 
     # TODO: check that lags are compatible with dt
 
-    @typed
-    def get_dxdt() -> Float[Array, "n"]:
-        t = t_list[-1]
-        x = h_list[-1]
-        return get_dxdt_core(t, x)
+    def get_dxdt(i: int, t: Float[Array, ""]) -> Float[Array, "n"]:
+        return get_dxdt_core(t, jnp.asarray(h[i]))
 
+    x = h[0]
     if method == "Euler":
-        for t in jnp.arange(t0, t1, dt):
-            x = h_list[-1]
-            dxdt = get_dxdt()
-            t_list.append(t + dt)
-            h_list.append(x + dxdt * dt)
+        for i, t in enumerate(periods[:-1]):
+            dxdt = get_dxdt(i, t)
+            x += dxdt * dt
+            h[i + 1] = x
     elif method == "Heun":
-        for t in jnp.arange(t0, t1, dt):
-            x = h_list[-1]
-            dxdt0 = get_dxdt()
-            t_list.append(t + dt)
-            h_list.append(x + dxdt0 * dt)
-            dxdt1 = get_dxdt()
-            h_list[-1] = x + 0.5 * (dxdt0 + dxdt1) * dt
-    return jnp.stack(t_list), jnp.stack(h_list)
+        for i, t in enumerate(periods[:-1]):
+            dxdt0 = get_dxdt(i, t)
+            h[i + 1] = x + dxdt0 * dt
+            dxdt1 = get_dxdt(i + 1, t + dt)
+            x += 0.5 * (dxdt0 + dxdt1) * dt
+            h[i + 1] = x
+    return np.array(periods), h
 
 
 with open("code.txt", "r", encoding="utf-8") as f:
-    args, get_x0, get_dxdt = compile_program(f.read())
+    args, variables, get_x0, get_dxdt = compile_program(f.read())
 
 with open("jaxpr.txt", "w", encoding="utf-8") as f:
-    print(make_jaxpr(get_dxdt)(0.0, get_x0()).pretty_print(use_color=False), file=f)
-
-x0 = get_x0()
-print("Initial values:", x0)
-
-t = 0.0
-x = x0
-dxdt = get_dxdt(t, x)
-print("dxdt at t=0:", dxdt)
+    print(
+        make_jaxpr(get_dxdt)(jnp.array(0.0), get_x0()).pretty_print(use_color=False),
+        file=f,
+    )
 
 
-@typed
-def benchmark(N: int) -> float:
-    t = 0.0
-    x = x0
-    start_time = time.time()
-    for _ in range(N):
-        d = get_dxdt(t, x)
-        x = x + d
-        t = t + 1
-    finish_time = time.time()
-    return (finish_time - start_time) / N
+start_time = time.time()
+t, h = simulate(args, get_x0, get_dxdt)
+finish_time = time.time()
+print(f"Elapsed time: {finish_time - start_time} s")
 
-
-for N in [1, 10, 100, 1000, 10000]:
-    print(f"{N} iterations: {benchmark(N)} sec/it")
+df = pd.DataFrame({"t": t})
+for i, var in enumerate(variables):
+    df[var] = h[:, i]
+df.to_csv("result.csv", index=False)
 
 """
 Now I need to introduce time-lagged variables. They should look like this in the code:
