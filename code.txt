@@ -1,3 +1,5 @@
+# A thermostat simulation with time-lagged measurements
+
 T0: 0.0
 T1: 30.0
 DT: 0.1
@@ -6,9 +8,11 @@ METHOD: Heun
 INIT:
 T_out: -5
 T_cur: 10
+T_cur[0.5]: 10                                              # the value is not important, T_cur will be used
 T_goal: 18
 
 DIFF:
-T_out: (sin(t)*10 - T_out) * 10.0
-T_cur: (T_goal - T_cur) * 0.5 + (T_out - T_cur) * 0.1
-T_goal: 0
+T_out: (sin(t)*10 - T_out) * 10.0                           # hacky way to control variable instead of its derivative
+T_cur: (T_goal - T_cur[0.5]) * 0.5\                         # first feedback loop: thermostat pushes T_cur to T_goal, and T_cur is measured with 0.5 sec lag
+     + (T_out - T_cur) * 0.1                                # second feedback loop: heat leackage pushes T_cur to T_out
+T_goal: 0                                                   # hacky way to have named constants

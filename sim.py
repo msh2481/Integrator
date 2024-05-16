@@ -15,7 +15,12 @@ from numpy import ndarray as ND
 def parse_program(
     program: str,
 ) -> tuple[dict[str, Any], dict[str, float], dict[str, str]]:
-    program = program.replace("\\\n", " ")
+    lines = []
+    for line in program.split("\n"):
+        if "#" in line:
+            line = line[: line.index("#")]
+        lines.append(line.strip())
+    program = "\n".join(lines).replace("\\\n", " ")
     init_values = {}
     diff_eqs = {}
 
@@ -66,11 +71,14 @@ def generate_get_dxdt(
 
     def substitute_vars(eq):
         for var, idx in var_to_idx.items():
-            eq = re.sub(r"\b" + re.escape(var) + r"\b", f"x[{idx}]", eq)
+            if "[" in var:
+                eq = re.sub(re.escape(var), f"x[{idx}]", eq)
+        for var, idx in var_to_idx.items():
+            if "[" not in var:
+                eq = re.sub(re.escape(var), f"x[{idx}]", eq)
         return eq
 
     substituted_eqs = {var: substitute_vars(eq) for var, eq in diff_eqs.items()}
-    print(substituted_eqs)
 
     math_functions = {
         "sin": jnp.sin,
@@ -93,6 +101,8 @@ def generate_get_dxdt(
         "round": jnp.round,
         "pi": jnp.pi,
     }
+
+    print(substituted_eqs)
 
     def jax_dxdt(t: Float[Array, ""], x: Float[Array, "n"]) -> Float[Array, "n"]:
         dxdt = []
@@ -127,6 +137,7 @@ def compile_program(
 @typed
 def simulate(
     args: dict[str, Any],
+    variables: list[str],
     get_x0: Callable[[], Float[ND, "n"]],
     get_dxdt_core: Callable[[Float[Array, ""], Float[Array, "n"]], Float[Array, "n"]],
 ) -> tuple[Float[ND, "periods"], Float[ND, "periods n"]]:
@@ -142,10 +153,24 @@ def simulate(
     h = np.zeros((len(periods), len(get_x0())))
     h[0] = get_x0()
 
-    # TODO: check that lags are compatible with dt
+    lag_vars: list[tuple[int, int, int]] = []
+    for name in variables:
+        if "[" not in name:
+            continue
+        base = name.split("[")[0]
+        lag = float(name.split("[")[1].split("]")[0])
+        lag_periods = int(np.ceil(lag / dt))
+        assert (
+            abs(lag - lag_periods * dt) < 1e-6
+        ), "lag must be an integer multiple of dt"
+        lag_vars.append((variables.index(base), variables.index(name), lag_periods))
 
     def get_dxdt(i: int, t: Float[Array, ""]) -> Float[Array, "n"]:
-        return get_dxdt_core(t, jnp.asarray(h[i]))
+        x = h[i]
+        # this assignment has side effects, it updates values in h
+        for src, dst, d in lag_vars:
+            x[dst] = h[max(i - d, 0), src]
+        return get_dxdt_core(t, jnp.asarray(x))
 
     x = h[0]
     if method == "Euler":
@@ -160,6 +185,7 @@ def simulate(
             dxdt1 = get_dxdt(i + 1, t + dt)
             x += 0.5 * (dxdt0 + dxdt1) * dt
             h[i + 1] = x
+    _ = get_dxdt(len(periods) - 1, periods[-1])  # to correctly set lagged variables
     return np.array(periods), h
 
 
@@ -174,7 +200,7 @@ with open("jaxpr.txt", "w", encoding="utf-8") as f:
 
 
 start_time = time.time()
-t, h = simulate(args, get_x0, get_dxdt)
+t, h = simulate(args, variables, get_x0, get_dxdt)
 finish_time = time.time()
 print(f"Elapsed time: {finish_time - start_time} s")
 
@@ -182,23 +208,3 @@ df = pd.DataFrame({"t": t})
 for i, var in enumerate(variables):
     df[var] = h[:, i]
 df.to_csv("result.csv", index=False)
-
-"""
-Now I need to introduce time-lagged variables. They should look like this in the code:
-
-T_cur: (T_goal - T_cur) * 0.2 + (T_out[0.1] - T_cur) * 0.05
-
-It can be simplified by creating a new variable:
-
-INIT:
-T_out[0.1]: <same as T_out>
-...
-
-Then during parsing I should check that the requested time delta is representable with current time step. And during 
-the simulation I should put the values from T_out to T_out[0.1] with the desired lag, before passing x to get_dxdt.
-For the first few periods there will be no reference value to take, so just take the initial one.
-
-What to do if I want to apply backward Euler method or something like that? Well, I would first do a honest step with 
-forward method, which will use all needed substitutions. Then I will take dxdt in that point, average with the initial one,
-and take a new step. Should be easy.
-"""
