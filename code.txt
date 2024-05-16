@@ -1,0 +1,16 @@
+T0: 0.0
+DT: 1e-3
+METHOD: Euler
+
+INIT:
+T_out: -5
+T_cur: 10
+T_goal: 18
+
+DIFF:
+T_out: \
+(sin(t/10)*10 - T_out) * 0.5
+
+T_cur: (T_goal - T_cur) * 0.2 + (T_out - T_cur) * 0.05
+
+T_goal: 0
