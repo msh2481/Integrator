@@ -10,11 +10,37 @@ from jax import Array, jit, make_jaxpr
 from jaxtyping import Float, Int
 from numpy import ndarray as ND
 
+math_functions = {
+    "sin": jnp.sin,
+    "cos": jnp.cos,
+    "tan": jnp.tan,
+    "arcsin": jnp.arcsin,
+    "arccos": jnp.arccos,
+    "arctan": jnp.arctan,
+    "sinh": jnp.sinh,
+    "cosh": jnp.cosh,
+    "tanh": jnp.tanh,
+    "exp": jnp.exp,
+    "log": jnp.log,
+    "log10": jnp.log10,
+    "sqrt": jnp.sqrt,
+    "abs": jnp.abs,
+    "ceil": jnp.ceil,
+    "floor": jnp.floor,
+    "sign": jnp.sign,
+    "round": jnp.round,
+    "pi": jnp.pi,
+    "max": jnp.maximum,
+    "min": jnp.minimum,
+    "clip": jnp.clip,
+    "sigmoid": lambda x: 1.0 / (1.0 + jnp.exp(-x)),
+}
+
 
 @typed
 def parse_program(
     program: str,
-) -> tuple[dict[str, Any], dict[str, float], dict[str, str]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, str], dict[str, str]]:
     lines = []
     for line in program.split("\n"):
         if "#" in line:
@@ -24,88 +50,89 @@ def parse_program(
     init_values = {}
     diff_eqs = {}
 
-    init_section = False
-    diff_section = False
+    section = None
     args: dict[str, Any] = {}
+    defines: dict[str, Any] = {}
 
     for line in program.split("\n"):
         line = line.strip()
-        if line == "INIT:":
-            init_section = True
-            diff_section = False
+        if any(line.startswith(key + ":") for key in ["DEFINE", "INIT", "DIFF"]):
+            section = line.split(":")[0].strip()
             continue
-        elif line == "DIFF:":
-            init_section = False
-            diff_section = True
-            continue
-        elif any(line.startswith(key + ":") for key in ["T0", "T1", "DT", "METHOD"]):
+        if any(line.startswith(key + ":") for key in ["T0", "T1", "DT", "METHOD"]):
             args[line.split(":")[0].strip()] = line.split(":")[1].strip()
-        elif not line:
+            continue
+        if not line:
             continue
 
-        if init_section:
+        if section == "INIT":
             var, value = line.split(":")
             var = var.strip()
-            init_values[var] = float(value.strip())
+            for src, target in defines.items():
+                var = re.sub("\\b" + re.escape(src) + "\\b", str(target), var)
+            init_values[var] = value.strip()
             if var not in diff_eqs:
                 diff_eqs[var] = "0.0"
-        elif diff_section:
+        elif section == "DEFINE":
+            var, value = line.split(":")
+            var = var.strip()
+            value = value.strip()
+            assert var not in defines
+            try:
+                # if already a number, put as is
+                _ = float(value)
+                defines[var] = value
+            except ValueError:
+                defines[var] = eval(value, {**math_functions, **defines, **args})
+        elif section == "DIFF":
             var, eq = line.split(":")
             diff_eqs[var.strip()] = eq.strip()
 
-    return args, init_values, diff_eqs
+    return args, defines, init_values, diff_eqs
 
 
 @typed
-def generate_get_x0(init_values: dict[str, float]) -> Callable[[], Float[ND, "n"]]:
+def generate_get_x0(
+    init_values: dict[str, str],
+    defines: dict[str, Any],
+    args: dict[str, Any],
+) -> Callable[[], Float[ND, "n"]]:
     @typed
     def get_x0() -> Float[ND, "n"]:
-        return np.array(list(init_values.values()))
+        return np.array(
+            [
+                eval(e, {**math_functions, **defines, **args})
+                for e in init_values.values()
+            ]
+        )
 
     return get_x0
 
 
 @typed
 def generate_get_dxdt(
-    diff_eqs: dict[str, str], init_values: dict[str, float]
+    diff_eqs: dict[str, str],
+    variables: list[str],
+    defines: dict[str, Any],
+    args: dict[str, Any],
 ) -> Callable[[Float[Array, ""], Float[Array, "n"]], Float[Array, "n"]]:
-    variables = list(init_values.keys())
     var_to_idx = {var: idx for idx, var in enumerate(variables)}
 
     def substitute_vars(eq):
+        for name, value in defines.items():
+            eq = re.sub("\\b" + re.escape(name) + "\\b", str(value), eq)
         for var, idx in var_to_idx.items():
             if "[" in var:
                 eq = re.sub(re.escape(var), f"x[{idx}]", eq)
         for var, idx in var_to_idx.items():
             if "[" not in var:
-                eq = re.sub(re.escape(var), f"x[{idx}]", eq)
+                eq = re.sub("\\b" + re.escape(var) + "\\b", f"x[{idx}]", eq)
         return eq
 
     substituted_eqs = {var: substitute_vars(eq) for var, eq in diff_eqs.items()}
 
-    math_functions = {
-        "sin": jnp.sin,
-        "cos": jnp.cos,
-        "tan": jnp.tan,
-        "arcsin": jnp.arcsin,
-        "arccos": jnp.arccos,
-        "arctan": jnp.arctan,
-        "sinh": jnp.sinh,
-        "cosh": jnp.cosh,
-        "tanh": jnp.tanh,
-        "exp": jnp.exp,
-        "log": jnp.log,
-        "log10": jnp.log10,
-        "sqrt": jnp.sqrt,
-        "abs": jnp.abs,
-        "ceil": jnp.ceil,
-        "floor": jnp.floor,
-        "sign": jnp.sign,
-        "round": jnp.round,
-        "pi": jnp.pi,
-    }
-
     print(substituted_eqs)
+    assert "t" not in defines and "x" not in defines
 
     def jax_dxdt(t: Float[Array, ""], x: Float[Array, "n"]) -> Float[Array, "n"]:
         dxdt = []
@@ -113,7 +140,8 @@ def generate_get_dxdt(
             derivative = 0.0
             if var in substituted_eqs:
                 derivative = eval(
-                    substituted_eqs[var], {"t": t, "x": x, **math_functions}
+                    substituted_eqs[var],
+                    {"t": t, "x": x, **args, **math_functions},
                 )
             dxdt.append(derivative)
         return jnp.array(dxdt)
@@ -130,11 +158,14 @@ def compile_program(
     Callable[[], Float[ND, "n"]],
     Callable[[Float[Array, ""], Float[Array, "n"]], Float[Array, "n"]],
 ]:
-    args, init_values, diff_eqs = parse_program(program)
+    args, defines, init_values, diff_eqs = parse_program(program)
+    print(args)
+    print(defines)
+    print(init_values)
     assert set(init_values.keys()) == set(diff_eqs.keys())
     variables = list(init_values.keys())
-    get_x0 = generate_get_x0(init_values)
-    get_dxdt = generate_get_dxdt(diff_eqs, init_values)
+    get_x0 = generate_get_x0(init_values, defines, args)
+    get_dxdt = generate_get_dxdt(diff_eqs, variables, defines, args)
     return args, variables, get_x0, get_dxdt
 
 

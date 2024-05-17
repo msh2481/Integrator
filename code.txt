@@ -1,15 +1,21 @@
 # A thermostat simulation with time-lagged measurements
 
 T0: 0.0
-T1: 10.0
-DT: 0.05
+T1: 20.0
+DT: 0.01
 METHOD: Heun
 
-INIT:
-temp: 20.0
-temp[0.5]: 20.0
-want: 30.0
+DEFINE:
+k: pi
+lag: k / k
 
+INIT:
+a: 1.0
+b: 1.0
+c: 1.0
+c[lag]: 1.0
 
 DIFF:
-temp: (want - temp[0.5]) * 4
+a: -k * (c - c[lag])
+b: a
+c: b

@@ -1,17 +1,22 @@
-{ lambda ; a:f32[] b:f32[3]. let
-    c:f32[3] = pjit[
+{ lambda ; a:f32[] b:f32[4]. let
+    c:f32[4] = pjit[
       name=jax_dxdt
-      jaxpr={ lambda ; d:f32[] e:f32[3]. let
+      jaxpr={ lambda ; d:f32[] e:f32[4]. let
           f:f32[1] = slice[limit_indices=(3,) start_indices=(2,) strides=None] e
           g:f32[] = squeeze[dimensions=(0,)] f
-          h:f32[1] = slice[limit_indices=(2,) start_indices=(1,) strides=None] e
+          h:f32[1] = slice[limit_indices=(4,) start_indices=(3,) strides=None] e
           i:f32[] = squeeze[dimensions=(0,)] h
           j:f32[] = sub g i
-          k:f32[] = mul j 4.0
-          l:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] k
-          m:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] 0.0
-          n:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] 0.0
-          o:f32[3] = concatenate[dimension=0] l m n
-        in (o,) }
+          k:f32[] = mul -3.1415927410125732 j
+          l:f32[1] = slice[limit_indices=(1,) start_indices=(0,) strides=None] e
+          m:f32[] = squeeze[dimensions=(0,)] l
+          n:f32[1] = slice[limit_indices=(2,) start_indices=(1,) strides=None] e
+          o:f32[] = squeeze[dimensions=(0,)] n
+          p:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] k
+          q:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] m
+          r:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] o
+          s:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] 0.0
+          t:f32[4] = concatenate[dimension=0] p q r s
+        in (t,) }
     ] a b
   in (c,) }
