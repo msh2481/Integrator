@@ -78,12 +78,7 @@ def parse_program(
             var = var.strip()
             value = value.strip()
             assert var not in defines
-            try:
-                # if already a number, put as is
-                _ = float(value)
-                defines[var] = value
-            except ValueError:
-                defines[var] = eval(value, {**math_functions, **defines, **args})
+            defines[var] = eval(value, {**math_functions, **defines, **args})
         elif section == "DIFF":
             var, eq = line.split(":")
             diff_eqs[var.strip()] = eq.strip()

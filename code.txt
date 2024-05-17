@@ -1,21 +1,33 @@
-# A thermostat simulation with time-lagged measurements
-
 T0: 0.0
-T1: 20.0
+T1: 300.0
 DT: 0.01
 METHOD: Heun
 
 DEFINE:
-k: pi
-lag: k / k
+growth: 1.0
+death: 0.01
+rate: 0.2
+p: 6
 
 INIT:
-a: 1.0
-b: 1.0
-c: 1.0
-c[lag]: 1.0
+effort: 0.0
+resting: 1.0
+tired: 0.0
+muscle: 0.0
+r_tired: 0.0
 
 DIFF:
-a: -k * (c - c[lag])
-b: a
-c: b
+
+# assume muscles consist of a large number of "cells"
+# each can be resting, or tired
+# resting -> tired: effort
+# tired -> resting: (resting / (tired + resting)) * (1 - effort)**p, 
+#                   and here it multiplies by (1 + tired / (tired + resting) * growth)
+# anything -> nothing: death * muscle
+
+effort: 100 * ((sin(t/2) > 0.5) - effort)
+resting: -(rate * effort + death * muscle) * resting + rate * (1 - r_tired) * (1 - effort)**p * tired * (1 + r_tired * growth)
+tired: -(rate * (1 - r_tired) * (1 - effort)**p + death * muscle) * tired + rate * effort * resting
+muscle: 10 * ((resting + tired) - muscle)                                                           # muscle = sum of all types
+r_tired: 10 * (tired / (tired + resting) - r_tired)
+
