@@ -60,7 +60,12 @@ def parse_program(
             section = line.split(":")[0].strip()
             continue
         if any(line.startswith(key + ":") for key in ["T0", "T1", "DT", "METHOD"]):
-            args[line.split(":")[0].strip()] = line.split(":")[1].strip()
+            key = line.split(":")[0].strip()
+            args[key] = line.split(":")[1].strip()
+            try:
+                args[key] = float(args[key])
+            except ValueError:
+                pass
             continue
         if not line:
             continue

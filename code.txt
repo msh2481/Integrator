@@ -1,33 +1,16 @@
 T0: 0.0
-T1: 300.0
-DT: 0.01
-METHOD: Heun
+T1: 5.0
+DT: 0.01            # simulation time step
+METHOD: Heun        # numerical method, currently either "Heun" or "Euler"
 
-DEFINE:
-growth: 1.0
-death: 0.01
-rate: 0.2
-p: 6
+DEFINE:             # these are first evaluated with `eval` and then substituted into the equations
+k: 1.0
+delay: 100 * DT     # delays should be multiples of DT
+f0: 1.0
 
-INIT:
-effort: 0.0
-resting: 1.0
-tired: 0.0
-muscle: 0.0
-r_tired: 0.0
+INIT:               # initial values
+f: f0
+f[delay]: f0
 
-DIFF:
-
-# assume muscles consist of a large number of "cells"
-# each can be resting, or tired
-# resting -> tired: effort
-# tired -> resting: (resting / (tired + resting)) * (1 - effort)**p, 
-#                   and here it multiplies by (1 + tired / (tired + resting) * growth)
-# anything -> nothing: death * muscle
-
-effort: 100 * ((sin(t/2) > 0.5) - effort)
-resting: -(rate * effort + death * muscle) * resting + rate * (1 - r_tired) * (1 - effort)**p * tired * (1 + r_tired * growth)
-tired: -(rate * (1 - r_tired) * (1 - effort)**p + death * muscle) * tired + rate * effort * resting
-muscle: 10 * ((resting + tired) - muscle)                                                           # muscle = sum of all types
-r_tired: 10 * (tired / (tired + resting) - r_tired)
-
+DIFF:               # expressions for derivatives, 0 if not specified
+f: k * f[delay]
