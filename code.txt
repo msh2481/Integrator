@@ -1,16 +1,20 @@
 T0: 0.0
-T1: 5.0
-DT: 0.01            # simulation time step
-METHOD: Heun        # numerical method, currently either "Heun" or "Euler"
+T1: 200.0
+DT: 0.01 
+METHOD: Heun 
 
-DEFINE:             # these are first evaluated with `eval` and then substituted into the equations
-k: 1.0
-delay: 100 * DT     # delays should be multiples of DT
-f0: 1.0
+DEFINE:
+d: 0.12
 
-INIT:               # initial values
-f: f0
-f[delay]: f0
+INIT: 
+a: 1.0
+b: 1.0
+c: 1.0
+a[d]: 1.0
+b[d]: 1.0
+c[d]: 1.0
 
-DIFF:               # expressions for derivatives, 0 if not specified
-f: k * f[delay]
+DIFF:   
+a: 10 * (b[d] - a[d])
+b: a * (28 - c) - b
+c: a * b - 8 * c / 3

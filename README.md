@@ -28,5 +28,6 @@ Now run `python sim.py` to get the values in `result.csv` and `python show.py` t
 ![example](img/exponent.svg)
 
 By the way, this function can be written analytically as:
-$$ f(x) = \sum_{n=0}^{\infty} \frac{\max(0, x - n + 1)^n}{n!} $$
+
+$$f(x) = \sum_{n=0}^{\infty} \frac{\max(0, x - n + 1)^n}{n!}$$
 

@@ -1,13 +1,39 @@
-{ lambda ; a:f32[] b:f32[2]. let
-    c:f32[2] = pjit[
+{ lambda ; a:f32[] b:f32[6]. let
+    c:f32[6] = pjit[
       name=jax_dxdt
-      jaxpr={ lambda ; d:f32[] e:f32[2]. let
-          f:f32[1] = slice[limit_indices=(2,) start_indices=(1,) strides=None] e
+      jaxpr={ lambda ; d:f32[] e:f32[6]. let
+          f:f32[1] = slice[limit_indices=(5,) start_indices=(4,) strides=None] e
           g:f32[] = squeeze[dimensions=(0,)] f
-          h:f32[] = mul 1.0 g
-          i:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] h
-          j:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] 0.0
-          k:f32[2] = concatenate[dimension=0] i j
-        in (k,) }
+          h:f32[1] = slice[limit_indices=(4,) start_indices=(3,) strides=None] e
+          i:f32[] = squeeze[dimensions=(0,)] h
+          j:f32[] = sub g i
+          k:f32[] = mul 10.0 j
+          l:f32[1] = slice[limit_indices=(1,) start_indices=(0,) strides=None] e
+          m:f32[] = squeeze[dimensions=(0,)] l
+          n:f32[1] = slice[limit_indices=(3,) start_indices=(2,) strides=None] e
+          o:f32[] = squeeze[dimensions=(0,)] n
+          p:f32[] = sub 28.0 o
+          q:f32[] = mul m p
+          r:f32[1] = slice[limit_indices=(2,) start_indices=(1,) strides=None] e
+          s:f32[] = squeeze[dimensions=(0,)] r
+          t:f32[] = sub q s
+          u:f32[1] = slice[limit_indices=(1,) start_indices=(0,) strides=None] e
+          v:f32[] = squeeze[dimensions=(0,)] u
+          w:f32[1] = slice[limit_indices=(2,) start_indices=(1,) strides=None] e
+          x:f32[] = squeeze[dimensions=(0,)] w
+          y:f32[] = mul v x
+          z:f32[1] = slice[limit_indices=(3,) start_indices=(2,) strides=None] e
+          ba:f32[] = squeeze[dimensions=(0,)] z
+          bb:f32[] = mul 8.0 ba
+          bc:f32[] = div bb 3.0
+          bd:f32[] = sub y bc
+          be:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] k
+          bf:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] t
+          bg:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] bd
+          bh:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] 0.0
+          bi:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] 0.0
+          bj:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] 0.0
+          bk:f32[6] = concatenate[dimension=0] be bf bg bh bi bj
+        in (bk,) }
     ] a b
   in (c,) }
