@@ -2,11 +2,13 @@ import re
 import time
 
 import jax.numpy as jnp
+
+import jax.random as jrnd
 import numpy as np
 import pandas as pd
 from beartype import beartype as typed
 from beartype.typing import Any, Callable
-from jax import Array, jit, make_jaxpr
+from jax import Array, jit, lax, make_jaxpr
 from jaxtyping import Float, Int
 from numpy import ndarray as ND
 
@@ -34,6 +36,9 @@ math_functions = {
     "min": jnp.minimum,
     "clip": jnp.clip,
     "sigmoid": lambda x: 1.0 / (1.0 + jnp.exp(-x)),
+    "key": jrnd.key,
+    "uniform": jrnd.uniform,
+    "normal": jrnd.normal,
 }
 
 
@@ -59,7 +64,9 @@ def parse_program(
         if any(line.startswith(key + ":") for key in ["DEFINE", "INIT", "DIFF"]):
             section = line.split(":")[0].strip()
             continue
-        if any(line.startswith(key + ":") for key in ["T0", "T1", "DT", "METHOD"]):
+        if any(
+            line.startswith(key + ":") for key in ["T0", "T1", "DT", "METHOD", "SEED"]
+        ):
             key = line.split(":")[0].strip()
             args[key] = line.split(":")[1].strip()
             try:
@@ -135,13 +142,14 @@ def generate_get_dxdt(
     assert "t" not in defines and "x" not in defines
 
     def jax_dxdt(t: Float[Array, ""], x: Float[Array, "n"]) -> Float[Array, "n"]:
+        seed = jrnd.PRNGKey(lax.bitcast_convert_type(t, jnp.int32) ^ hash(args["SEED"]))
         dxdt = []
         for var in variables:
             derivative = 0.0
             if var in substituted_eqs:
                 derivative = eval(
                     substituted_eqs[var],
-                    {"t": t, "x": x, **args, **math_functions},
+                    {"t": t, "x": x, **args, **math_functions, "seed": seed},
                 )
             dxdt.append(derivative)
         return jnp.array(dxdt)

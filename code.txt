@@ -1,16 +1,11 @@
 T0: 0.0
 T1: 10.0
-DT: 0.0001
+DT: 0.001
 METHOD: Heun 
+SEED: 2
 
-INIT: 
-h: 0.0
-f: 1.0
-g: 1.0
-train: 0.0
+INIT:
+f: 0.0
 
 DIFF:
-train: (sin(t*30) - train) * 10
-f: (train > 0) * (-1) + (train < 0) * 1
-h: (train > 0) * 1 + (train < 0) * (-h - 1) * (h > 0) 
-g: (train > 0) * sqrt(max(f, 0)) * h
+f: normal(seed) / sqrt(DT)
