@@ -1,20 +1,16 @@
 T0: 0.0
-T1: 200.0
-DT: 0.01 
+T1: 10.0
+DT: 0.0001
 METHOD: Heun 
 
-DEFINE:
-d: 0.12
-
 INIT: 
-a: 1.0
-b: 1.0
-c: 1.0
-a[d]: 1.0
-b[d]: 1.0
-c[d]: 1.0
+h: 0.0
+f: 1.0
+g: 1.0
+train: 0.0
 
-DIFF:   
-a: 10 * (b[d] - a[d])
-b: a * (28 - c) - b
-c: a * b - 8 * c / 3
+DIFF:
+train: (sin(t*30) - train) * 10
+f: (train > 0) * (-1) + (train < 0) * 1
+h: (train > 0) * 1 + (train < 0) * (-h - 1) * (h > 0) 
+g: (train > 0) * sqrt(max(f, 0)) * h

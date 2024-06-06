@@ -1,39 +1,64 @@
-{ lambda ; a:f32[] b:f32[6]. let
-    c:f32[6] = pjit[
+{ lambda ; a:f32[] b:f32[4]. let
+    c:f32[4] = pjit[
       name=jax_dxdt
-      jaxpr={ lambda ; d:f32[] e:f32[6]. let
-          f:f32[1] = slice[limit_indices=(5,) start_indices=(4,) strides=None] e
+      jaxpr={ lambda ; d:f32[] e:f32[4]. let
+          f:f32[1] = slice[limit_indices=(4,) start_indices=(3,) strides=None] e
           g:f32[] = squeeze[dimensions=(0,)] f
-          h:f32[1] = slice[limit_indices=(4,) start_indices=(3,) strides=None] e
-          i:f32[] = squeeze[dimensions=(0,)] h
-          j:f32[] = sub g i
-          k:f32[] = mul 10.0 j
-          l:f32[1] = slice[limit_indices=(1,) start_indices=(0,) strides=None] e
-          m:f32[] = squeeze[dimensions=(0,)] l
-          n:f32[1] = slice[limit_indices=(3,) start_indices=(2,) strides=None] e
+          h:bool[] = gt g 0.0
+          i:i32[] = convert_element_type[new_dtype=int32 weak_type=True] h
+          j:i32[] = mul i 1
+          k:f32[1] = slice[limit_indices=(4,) start_indices=(3,) strides=None] e
+          l:f32[] = squeeze[dimensions=(0,)] k
+          m:bool[] = lt l 0.0
+          n:f32[1] = slice[limit_indices=(1,) start_indices=(0,) strides=None] e
           o:f32[] = squeeze[dimensions=(0,)] n
-          p:f32[] = sub 28.0 o
-          q:f32[] = mul m p
-          r:f32[1] = slice[limit_indices=(2,) start_indices=(1,) strides=None] e
-          s:f32[] = squeeze[dimensions=(0,)] r
-          t:f32[] = sub q s
-          u:f32[1] = slice[limit_indices=(1,) start_indices=(0,) strides=None] e
-          v:f32[] = squeeze[dimensions=(0,)] u
-          w:f32[1] = slice[limit_indices=(2,) start_indices=(1,) strides=None] e
-          x:f32[] = squeeze[dimensions=(0,)] w
-          y:f32[] = mul v x
-          z:f32[1] = slice[limit_indices=(3,) start_indices=(2,) strides=None] e
-          ba:f32[] = squeeze[dimensions=(0,)] z
-          bb:f32[] = mul 8.0 ba
-          bc:f32[] = div bb 3.0
-          bd:f32[] = sub y bc
-          be:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] k
-          bf:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] t
-          bg:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] bd
-          bh:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] 0.0
-          bi:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] 0.0
-          bj:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] 0.0
-          bk:f32[6] = concatenate[dimension=0] be bf bg bh bi bj
-        in (bk,) }
+          p:f32[] = neg o
+          q:f32[] = sub p 1.0
+          r:f32[] = convert_element_type[new_dtype=float32 weak_type=False] m
+          s:f32[] = mul r q
+          t:f32[1] = slice[limit_indices=(1,) start_indices=(0,) strides=None] e
+          u:f32[] = squeeze[dimensions=(0,)] t
+          v:bool[] = gt u 0.0
+          w:f32[] = convert_element_type[new_dtype=float32 weak_type=False] v
+          x:f32[] = mul s w
+          y:f32[] = convert_element_type[new_dtype=float32 weak_type=False] j
+          z:f32[] = add y x
+          ba:f32[1] = slice[limit_indices=(4,) start_indices=(3,) strides=None] e
+          bb:f32[] = squeeze[dimensions=(0,)] ba
+          bc:bool[] = gt bb 0.0
+          bd:i32[] = convert_element_type[new_dtype=int32 weak_type=True] bc
+          be:i32[] = mul bd -1
+          bf:f32[1] = slice[limit_indices=(4,) start_indices=(3,) strides=None] e
+          bg:f32[] = squeeze[dimensions=(0,)] bf
+          bh:bool[] = lt bg 0.0
+          bi:i32[] = convert_element_type[new_dtype=int32 weak_type=True] bh
+          bj:i32[] = mul bi 1
+          bk:i32[] = add be bj
+          bl:f32[1] = slice[limit_indices=(4,) start_indices=(3,) strides=None] e
+          bm:f32[] = squeeze[dimensions=(0,)] bl
+          bn:bool[] = gt bm 0.0
+          bo:f32[1] = slice[limit_indices=(2,) start_indices=(1,) strides=None] e
+          bp:f32[] = squeeze[dimensions=(0,)] bo
+          bq:f32[] = max bp 0.0
+          br:f32[] = sqrt bq
+          bs:f32[] = convert_element_type[new_dtype=float32 weak_type=False] bn
+          bt:f32[] = mul bs br
+          bu:f32[1] = slice[limit_indices=(1,) start_indices=(0,) strides=None] e
+          bv:f32[] = squeeze[dimensions=(0,)] bu
+          bw:f32[] = mul bt bv
+          bx:f32[] = mul d 30.0
+          by:f32[] = sin bx
+          bz:f32[1] = slice[limit_indices=(4,) start_indices=(3,) strides=None] e
+          ca:f32[] = squeeze[dimensions=(0,)] bz
+          cb:f32[] = convert_element_type[new_dtype=float32 weak_type=False] by
+          cc:f32[] = sub cb ca
+          cd:f32[] = mul cc 10.0
+          ce:f32[] = convert_element_type[new_dtype=float32 weak_type=False] bk
+          cf:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] z
+          cg:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] ce
+          ch:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] bw
+          ci:f32[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] cd
+          cj:f32[4] = concatenate[dimension=0] cf cg ch ci
+        in (cj,) }
     ] a b
   in (c,) }
