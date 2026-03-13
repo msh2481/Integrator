@@ -32,11 +32,11 @@ from simulate import simulate
 # High end includes possibility of undisclosed stockpiles / surge production.
 # Total BM high end ~3k (MRBM+SRBM+cruise), drones ~50k.
 
-IRAN_MRBM = (200, 1500)             # low: conservative OSINT; high: undisclosed + surge
-IRAN_SRBM = (300, 1500)             # Fateh family is high-volume
+IRAN_MRBM = (1000, 2000)             # low: conservative OSINT; high: undisclosed + surge
+IRAN_SRBM = (1000, 6000)             # Fateh family is high-volume
 IRAN_CRUISE = (100, 500)            # Paveh/Hoveyzeh/Quds
 IRAN_DRONE = (2000, 50000)          # on-hand; high end = full wartime stockpile
-IRAN_TEL = (80, 300)                # all types
+IRAN_TEL = (80, 200)                # all types
 
 # --- Iran: Production Rates (per year) ---
 
@@ -150,6 +150,16 @@ class IranMissiles(StateGroup):
     @reported
     def prod_cap(self):
         return self.production_capacity
+    
+    @property
+    @reported
+    def n_tels(self):
+        return self.tels
+
+    @property
+    @reported
+    def n_mrbm(self):
+        return self.mrbm
 
     def _init_state(self):
         self.mrbm = self.prior.sample("iran.mrbm_init", lu(*IRAN_MRBM))
@@ -300,7 +310,7 @@ class Conflict(StateGroup):
         """US wins when Iran's production is crippled and MRBM+SRBM stock near zero."""
         if self.outcome != 0:
             return 0.0, lambda: None
-        if self.iran.production_capacity < 0.01 and self.iran.mrbm < 10 and self.iran.srbm < 10:
+        if (self.iran.production_capacity < 0.01 and self.iran.mrbm < 10 and self.iran.srbm < 10) or self.iran.n_tels < 5:
             return 1000.0, lambda: setattr(self, 'outcome', 1.0)
         return 0.0, lambda: None
 
@@ -450,13 +460,16 @@ class Conflict(StateGroup):
     # --- US strikes Iranian TELs ---
     @transition
     def us_strikes_tels(self):
-        if self.iran.tels < 5:
+        if self.iran.tels < 1:
             return 0.0, lambda: None
 
         interval = self.prior.sample("us.tel_strike_interval", lu(*US_TEL_STRIKE_INTERVAL))
         rate = 1.0 / interval
 
         def effect():
+            if self.us.tomahawks < 1 or self.us.jassm < 1:
+                return
+
             kill_frac = self.prior.sample("us.tel_kill_frac", lu(*US_TEL_KILL_FRAC))
             destroyed = self.iran.tels * kill_frac
             self.iran.tels = max(0, self.iran.tels - destroyed)
