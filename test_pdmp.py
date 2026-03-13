@@ -5,9 +5,9 @@ import math
 import numpy as np
 from scipy import stats
 
-from pdmp.core import StateGroup, ode, transition, Prior
-from pdmp.simulate import simulate
-from pdmp.sensitivity import sensitivity
+from core import StateGroup, ode, transition, Prior
+from simulate import simulate
+from sensitivity import sensitivity
 
 
 # ===========================================================================

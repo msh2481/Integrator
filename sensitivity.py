@@ -7,7 +7,7 @@ from typing import Callable
 import numpy as np
 from scipy.stats import spearmanr
 
-from .simulate import Results
+from simulate import Results
 
 
 def sensitivity(

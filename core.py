@@ -23,6 +23,20 @@ def transition(fn):
     return fn
 
 
+def reported(fn):
+    """Mark a property as a reported metric (included in reported snapshot).
+
+    Works with either decorator order:
+        @property @reported  — fn is a function, mark it, return it
+        @reported @property  — fn is a property, mark its fget
+    """
+    if isinstance(fn, property):
+        fn.fget._is_reported = True
+        return fn
+    fn._is_reported = True
+    return fn
+
+
 # ---------------------------------------------------------------------------
 # Prior — trajectory-local sampler cache
 # ---------------------------------------------------------------------------
@@ -112,6 +126,11 @@ class StateGroup:
             child = getattr(self, name)
             child._wire_root(root, prior)
 
+    def _init_state(self):
+        """Called once per trajectory after prior is wired. Override to sample initial state."""
+        for name in self._children:
+            getattr(self, name)._init_state()
+
     def _collect_odes(self) -> list[tuple[StateGroup, callable]]:
         """Find all @ode methods in this group and descendants."""
         results = []
@@ -148,6 +167,25 @@ class StateGroup:
         for child_name in self._children:
             child = getattr(self, child_name)
             snap[child_name] = child._snapshot()
+        return snap
+
+    def _reported_snapshot(self) -> dict[str, Any]:
+        """Collect values of all @reported properties in the tree.
+
+        Returns a flat dict with dotted keys, e.g. 'iran.mrbm_depletion'.
+        """
+        snap = {}
+        prefix = type(self).__name__.lower()
+        for name in dir(self):
+            if name.startswith("_"):
+                continue
+            attr = getattr(type(self), name, None)
+            if isinstance(attr, property) and getattr(attr.fget, "_is_reported", False):
+                snap[name] = getattr(self, name)
+        for child_name in self._children:
+            child = getattr(self, child_name)
+            for k, v in child._reported_snapshot().items():
+                snap[f"{child_name}.{k}"] = v
         return snap
 
     def _apply_derivatives(self, group: 'StateGroup', derivs: dict[str, float], dt: float):

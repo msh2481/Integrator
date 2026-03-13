@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from .core import Prior, StateGroup
+from core import Prior, StateGroup
 
 
 # ---------------------------------------------------------------------------
@@ -19,11 +19,14 @@ from .core import Prior, StateGroup
 class TrajectoryResult:
     """Results from a single trajectory."""
 
-    def __init__(self, snapshots, event_log, prior_values, seed):
+    def __init__(self, snapshots, event_log, prior_values, seed,
+                 reported=None, reported_series=None):
         self.snapshots: list[tuple[float, dict]] = snapshots
         self.event_log: dict[str, list[float]] = event_log
         self.prior_values: dict[str, float] = prior_values
         self.seed: int | None = seed
+        self.reported: dict[str, Any] = reported or {}
+        self.reported_series: list[tuple[float, dict]] = reported_series or []
 
 
 class Results:
@@ -57,6 +60,7 @@ def _run_trajectory(world_template: StateGroup, t_end: float, dt: float,
         rng = np.random.default_rng()
     prior = Prior(rng)
     world._wire_root(world, prior)
+    world._init_state()
 
     # Discover ODE and transition methods
     odes = world._collect_odes()
@@ -67,12 +71,14 @@ def _run_trajectory(world_template: StateGroup, t_end: float, dt: float,
 
     # Recording
     snapshots: list[tuple[float, dict]] = []
+    reported_series: list[tuple[float, dict]] = []
     next_record = 0.0
 
     t = 0.0
 
     # Record initial state
     snapshots.append((t, world._snapshot()))
+    reported_series.append((t, world._reported_snapshot()))
     next_record = record_every
 
     while t_end - t > 1e-12:
@@ -123,17 +129,21 @@ def _run_trajectory(world_template: StateGroup, t_end: float, dt: float,
         # Check if we should record
         while next_record <= t + 1e-12:
             snapshots.append((t, world._snapshot()))
+            reported_series.append((t, world._reported_snapshot()))
             next_record += record_every
 
     # Final snapshot if not already recorded
     if len(snapshots) == 0 or abs(snapshots[-1][0] - t) > 1e-12:
         snapshots.append((t, world._snapshot()))
+        reported_series.append((t, world._reported_snapshot()))
 
     return TrajectoryResult(
         snapshots=snapshots,
         event_log=event_log,
         prior_values=prior.values(),
         seed=seed,
+        reported=world._reported_snapshot(),
+        reported_series=reported_series,
     )
 
 
