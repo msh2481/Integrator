@@ -1,10 +1,12 @@
 """Iran conflict simulation — March 2026 scenario.
 
-Models a multi-week US-Iran conflict with:
+Models a multi-month US-Iran conflict with:
 - Iranian ballistic missile, cruise missile, and drone salvos
 - US/coalition strikes on TELs and production facilities
 - Multi-layered missile defense (Arrow-3, Arrow-2, THAAD, PAC-3, David's Sling, Iron Dome)
 - Production/replenishment on both sides
+- Proxy fronts: Hezbollah (Lebanon), Houthis (Yemen), Iraqi militias
+- Proxy activation/degradation dynamics
 
 Time unit: 1 = 1 day.
 """
@@ -52,8 +54,8 @@ IRAN_MRBM_SALVO_FRAC = (0.01, 0.10) # fraction of available per salvo; Iran cons
 IRAN_MRBM_MIN_SALVO = 20            # minimum salvo size (fixed)
 IRAN_MISSILES_PER_TEL = 2           # per salvo window (fixed)
 
-IRAN_SRBM_SALVO_INTERVAL = (0.5, 3) # days between SRBM salvos
-IRAN_SRBM_PER_SALVO = (10, 100)     # missiles per salvo
+IRAN_SRBM_SALVO_INTERVAL = (1, 3)   # days between SRBM salvos
+IRAN_SRBM_PER_SALVO = (5, 25)       # missiles per salvo
 
 IRAN_DRONES_PER_DAY = (10, 300)     # drones launched per day (continuous ops)
 IRAN_CRUISE_PER_DAY = (2, 40)       # cruise missiles launched per day
@@ -82,6 +84,7 @@ PK_PAC3_VS_BM = (0.60, 0.92)        # mixed combat data
 PK_PAC3_VS_SRBM = (0.80, 0.96)
 PK_VS_DRONE = (0.60, 0.98)          # huge range: depends on fighter availability
 PK_VS_CRUISE = (0.65, 0.95)
+PK_CRAM = (0.30, 0.70)              # C-RAM vs rockets/drones; overwhelmed by swarms
 
 # --- Defense: Engagement Fractions per Layer ---
 
@@ -94,11 +97,24 @@ ENGAGE_FRAC_THAAD = (0.40, 0.75)
 GULF_PAC3 = (96, 384)               # 2-4 Patriot batteries in Gulf region
 GULF_THAAD = (48, 96)               # 1-2 THAAD batteries in Gulf
 
-# --- Defense: Resupply Rates (per month) ---
+# --- Defense: Global Production (per year) ---
+# These are total annual production, NOT what's available to theater.
+# Theater allocation is a fraction of this.
 
-DEFENSE_TAMIR_RESUPPLY = (50, 500)   # peacetime to max wartime surge
-DEFENSE_PAC3_RESUPPLY = (20, 80)
-DEFENSE_ARROW_RESUPPLY = (0.5, 8)    # Arrow-2/3 combined
+GLOBAL_TAMIR_PROD = (2000, 3000)     # Rafael Israel + RTX Camden (2026 ramp)
+GLOBAL_PAC3_PROD = (500, 650)        # Lockheed MSE line; 620 in 2025, 650 target
+GLOBAL_THAAD_PROD = (12, 96)         # 12/yr actual delivery (2024); 96/yr funded capacity
+GLOBAL_ARROW_PROD = (40, 100)        # Arrow-2+3 combined; IAI tripled post-war
+GLOBAL_DS_PROD = (100, 400)          # David's Sling Stunner; Rafael scaling up
+
+# --- Defense: Theater Allocation Fractions ---
+# What fraction of global production goes to this theater (Middle East).
+
+THEATER_TAMIR_SHARE = (0.85, 0.95)   # nearly all Tamir is for Israel
+THEATER_PAC3_SHARE = (0.15, 0.35)    # rest goes to NATO, Japan, Korea, etc.
+THEATER_THAAD_SHARE = (0.15, 0.40)   # 2 of 8 batteries deployed to Israel
+THEATER_DS_SHARE = (0.80, 0.95)      # primarily Israeli system
+GULF_PAC3_SHARE = (0.20, 0.50)       # Gulf's share of theater PAC-3 allocation
 
 # --- US Offensive (count) ---
 
@@ -112,8 +128,7 @@ US_JASSM_RESUPPLY = (50, 300)       # airlift from CONUS, limited by production
 
 # --- US: TEL Hunt ---
 
-US_TEL_STRIKE_INTERVAL = (0.2, 1.0)  # days between strike packages
-US_TEL_KILL_FRAC = (0.005, 0.08)     # 1991 was ~0; modern maybe 1-8%
+US_TEL_KILL_FRAC = (0.1, 0.18)
 US_TOMAHAWK_PER_TEL_STRIKE = (10, 40)
 US_JASSM_PER_TEL_STRIKE = (3, 20)
 
@@ -126,12 +141,78 @@ US_JASSM_PER_PROD_STRIKE = (10, 40)
 
 
 # ===================================================================
+# Hezbollah (post-2024 war residual stockpile)
+#
+# Pre-war: ~150k total. IDF destroyed 70-80%. Syria resupply corridor
+# severed after Assad fell Dec 2024. Resupply near zero.
+# ===================================================================
+
+HEZB_SR_ROCKETS = (5000, 15000)       # short-range (Katyusha/Grad/Fajr-3); <10k est. remaining
+HEZB_MR_ROCKETS = (300, 1500)         # medium-range (Fajr-5/Khaibar/Zelzal); <1k est. remaining
+HEZB_PGM = (20, 200)                  # precision-guided (Fateh w/ guidance kits); <100 est.
+HEZB_DRONES = (200, 1000)             # Ababil/Shahed remnants
+
+HEZB_SR_PER_DAY = (50, 500)           # peak was ~250/day in Nov 2024; theoretical 1500
+HEZB_MR_SALVO_INTERVAL = (1, 5)       # days between MR salvos
+HEZB_MR_PER_SALVO = (5, 30)
+HEZB_PGM_INTERVAL = (2, 10)           # days between precision strikes
+HEZB_PGM_PER_STRIKE = (1, 5)
+
+HEZB_LAUNCHERS = (100, 500)           # MRL vehicles + concealed launch sites
+HEZB_ROCKETS_PER_LAUNCHER = 10        # effective rockets per launcher per day
+
+HEZB_ACTIVATION_DELAY = (0.5, 5)      # days after conflict starts
+HEZB_LAUNCHER_KILL_FRAC = (0.02, 0.08)  # fraction of launchers destroyed per IAF strike-day
+
+# ===================================================================
+# Houthis (Ansar Allah, Yemen)
+#
+# Active since Oct 2023 Red Sea campaign. Iranian-supplied.
+# Can reach Israel (~2000km BMs), Gulf bases, Red Sea shipping.
+# Preliminary estimates — will refine with research data.
+# ===================================================================
+
+HOUTHI_BM = (100, 400)                # ~400 total incl ~120 Palestine-2 (UN 2025)
+HOUTHI_CRUISE = (100, 200)            # Quds variants; limited data
+HOUTHI_DRONES = (1000, 5000)          # Samad/Waid; large stockpile + domestic production
+
+HOUTHI_BM_INTERVAL = (3, 14)          # days between BM salvos at Israel/Gulf
+HOUTHI_BM_PER_SALVO = (1, 5)
+HOUTHI_DRONE_PER_DAY = (1, 10)        # demonstrated ~40/month ≈ 1.3/day sustained
+
+HOUTHI_LAUNCH_SITES = (10, 30)        # 14 mobile TELs confirmed; dispersed across 200km²
+HOUTHI_ACTIVATION_DELAY = (1, 14)     # may hold fire to conserve (observed Mar 2026)
+HOUTHI_SITE_KILL_FRAC = (0.005, 0.03) # hard to degrade (dispersed, mountainous terrain)
+
+HOUTHI_DRONE_PROD_PER_DAY = (1, 5)    # domestic assembly with Iranian components
+
+# ===================================================================
+# Iraqi Militias (PMF/Kata'ib Hezbollah)
+#
+# Short-range rockets and one-way attack drones targeting US bases
+# in Iraq/Syria/Kuwait. Direct overland resupply from Iran.
+# ===================================================================
+
+IRAQ_ROCKETS = (500, 2000)            # 107mm/122mm/Fajr + OWA drones
+IRAQ_CELLS = (20, 80)                # active militia launch cells
+IRAQ_PER_DAY = (1, 10)               # attacks per day on US bases
+IRAQ_ACTIVATION_DELAY = (1, 7)
+IRAQ_CELL_KILL_FRAC = (0.01, 0.05)   # US strikes on militia positions
+IRAQ_RESUPPLY_PER_DAY = (2, 20)       # overland from Iran; hard to interdict
+
+
+# ===================================================================
 # Helper
 # ===================================================================
 
+_lu_cache = {}
+
 def lu(low, high):
     """Log-uniform distribution over [low, high]."""
-    return stats.loguniform(low, high)
+    key = (low, high)
+    if key not in _lu_cache:
+        _lu_cache[key] = stats.loguniform(low, high)
+    return _lu_cache[key]
 
 
 # ===================================================================
@@ -244,14 +325,29 @@ class Interceptors(StateGroup):
 
     @ode
     def resupply(self):
-        tamir_mo = self.prior.sample("def.tamir_resupply_mo", lu(*DEFENSE_TAMIR_RESUPPLY))
-        pac3_mo = self.prior.sample("def.pac3_resupply_mo", lu(*DEFENSE_PAC3_RESUPPLY))
-        arrow_mo = self.prior.sample("def.arrow_resupply_mo", lu(*DEFENSE_ARROW_RESUPPLY))
+        # Each system: global_prod * theater_share / 365 = daily resupply
+        tamir_yr = self.prior.sample("global.tamir_prod_yr", lu(*GLOBAL_TAMIR_PROD))
+        tamir_share = self.prior.sample("global.tamir_theater_share", lu(*THEATER_TAMIR_SHARE))
+
+        pac3_yr = self.prior.sample("global.pac3_prod_yr", lu(*GLOBAL_PAC3_PROD))
+        pac3_share = self.prior.sample("global.pac3_theater_share", lu(*THEATER_PAC3_SHARE))
+        gulf_share = self.prior.sample("global.gulf_pac3_share", lu(*GULF_PAC3_SHARE))
+
+        thaad_yr = self.prior.sample("global.thaad_prod_yr", lu(*GLOBAL_THAAD_PROD))
+        thaad_share = self.prior.sample("global.thaad_theater_share", lu(*THEATER_THAAD_SHARE))
+
+        arrow_yr = self.prior.sample("global.arrow_prod_yr", lu(*GLOBAL_ARROW_PROD))
+
+        ds_yr = self.prior.sample("global.ds_prod_yr", lu(*GLOBAL_DS_PROD))
+        ds_share = self.prior.sample("global.ds_theater_share", lu(*THEATER_DS_SHARE))
+
         return {
-            "iron_dome": tamir_mo / 30,
-            "pac3": pac3_mo / 30,
-            "arrow2": arrow_mo / 30 * 0.6,
-            "arrow3": arrow_mo / 30 * 0.4,
+            "iron_dome": tamir_yr * tamir_share / 365,
+            "pac3": pac3_yr * pac3_share * (1 - gulf_share) / 365,
+            "thaad": thaad_yr * thaad_share / 365,
+            "davids_sling": ds_yr * ds_share / 365,
+            "arrow2": arrow_yr / 365 * 0.6,  # ~60% Arrow-2, 40% Arrow-3
+            "arrow3": arrow_yr / 365 * 0.4,
         }
 
 
@@ -263,14 +359,114 @@ class GulfDefense(StateGroup):
     pac3: float = 0.0
     thaad: float = 0.0
 
+    @property
+    @reported
+    def total_interceptors(self):
+        return self.pac3 + self.thaad
+
     def _init_state(self):
         self.pac3 = self.prior.sample("gulf.pac3_init", lu(*GULF_PAC3))
         self.thaad = self.prior.sample("gulf.thaad_init", lu(*GULF_THAAD))
 
     @ode
     def resupply(self):
-        pac3_mo = self.prior.sample("gulf.pac3_resupply_mo", lu(*DEFENSE_PAC3_RESUPPLY))
-        return {"pac3": pac3_mo / 30}
+        # Gulf gets gulf_share of the theater PAC-3 allocation
+        pac3_yr = self.prior.sample("global.pac3_prod_yr", lu(*GLOBAL_PAC3_PROD))
+        pac3_share = self.prior.sample("global.pac3_theater_share", lu(*THEATER_PAC3_SHARE))
+        gulf_share = self.prior.sample("global.gulf_pac3_share", lu(*GULF_PAC3_SHARE))
+        return {"pac3": pac3_yr * pac3_share * gulf_share / 365}
+
+
+# ===================================================================
+# Hezbollah (northern front)
+# ===================================================================
+
+class Hezbollah(StateGroup):
+    active: float = 0.0           # 0 = inactive, 1 = active
+    launchers: float = 0.0        # MRL vehicles + concealed launch sites
+    rockets_sr: float = 0.0
+    rockets_mr: float = 0.0
+    pgm: float = 0.0
+    drones: float = 0.0
+
+    @property
+    @reported
+    def hezb_launchers(self):
+        return self.launchers
+
+    @property
+    @reported
+    def hezb_sr(self):
+        return self.rockets_sr
+
+    def _init_state(self):
+        self.launchers = self.prior.sample("hezb.launchers_init", lu(*HEZB_LAUNCHERS))
+        self.rockets_sr = self.prior.sample("hezb.sr_init", lu(*HEZB_SR_ROCKETS))
+        self.rockets_mr = self.prior.sample("hezb.mr_init", lu(*HEZB_MR_ROCKETS))
+        self.pgm = self.prior.sample("hezb.pgm_init", lu(*HEZB_PGM))
+        self.drones = self.prior.sample("hezb.drone_init", lu(*HEZB_DRONES))
+
+
+# ===================================================================
+# Houthis (southern front)
+# ===================================================================
+
+class Houthis(StateGroup):
+    active: float = 0.0
+    launch_sites: float = 0.0    # dispersed TELs in mountains
+    bm: float = 0.0
+    cruise: float = 0.0
+    drones: float = 0.0
+
+    @property
+    @reported
+    def houthi_sites(self):
+        return self.launch_sites
+
+    @property
+    @reported
+    def houthi_drones(self):
+        return self.drones
+
+    def _init_state(self):
+        self.launch_sites = self.prior.sample("houthi.sites_init", lu(*HOUTHI_LAUNCH_SITES))
+        self.bm = self.prior.sample("houthi.bm_init", lu(*HOUTHI_BM))
+        self.cruise = self.prior.sample("houthi.cruise_init", lu(*HOUTHI_CRUISE))
+        self.drones = self.prior.sample("houthi.drone_init", lu(*HOUTHI_DRONES))
+
+    @ode
+    def drone_production(self):
+        if self.active < 0.5 or self.launch_sites < 1:
+            return {}
+        prod = self.prior.sample("houthi.drone_prod_day", lu(*HOUTHI_DRONE_PROD_PER_DAY))
+        return {"drones": prod}
+
+
+# ===================================================================
+# Iraqi Militias
+# ===================================================================
+
+class IraqiMilitias(StateGroup):
+    active: float = 0.0
+    cells: float = 0.0           # active militia launch cells
+    rockets: float = 0.0
+
+    @property
+    @reported
+    def iraq_cells(self):
+        return self.cells
+
+    def _init_state(self):
+        self.cells = self.prior.sample("iraq.cells_init", lu(*IRAQ_CELLS))
+        self.rockets = self.prior.sample("iraq.rockets_init", lu(*IRAQ_ROCKETS))
+
+    @ode
+    def resupply(self):
+        """Overland from Iran — hard to interdict."""
+        if self.active < 0.5:
+            return {}
+        rate = self.prior.sample("iraq.resupply_day", lu(*IRAQ_RESUPPLY_PER_DAY))
+        return {"rockets": rate}
 
 
 # ===================================================================
@@ -298,6 +494,9 @@ class Conflict(StateGroup):
     us: USOffense
     defense: Interceptors
     gulf: GulfDefense
+    hezb: Hezbollah
+    houthi: Houthis
+    iraq: IraqiMilitias
     damage: Damage
 
     outcome: float = 0.0  # +1 = US wins, -1 = Iran wins, 0 = undecided
@@ -324,6 +523,228 @@ class Conflict(StateGroup):
         if self.defense.bm_interceptors < 10:
             return 1000.0, lambda: setattr(self, 'outcome', -1.0)
         return 0.0, lambda: None
+
+    # ---------------------------------------------------------------
+    # Proxy activation — Iran turns on each front stochastically
+    # ---------------------------------------------------------------
+
+    @transition
+    def activate_hezbollah(self):
+        if self.hezb.active > 0.5:
+            return 0.0, lambda: None
+        delay = self.prior.sample("hezb.activation_delay", lu(*HEZB_ACTIVATION_DELAY))
+        return 1.0 / delay, lambda: setattr(self.hezb, 'active', 1.0)
+
+    @transition
+    def activate_houthis(self):
+        if self.houthi.active > 0.5:
+            return 0.0, lambda: None
+        delay = self.prior.sample("houthi.activation_delay", lu(*HOUTHI_ACTIVATION_DELAY))
+        return 1.0 / delay, lambda: setattr(self.houthi, 'active', 1.0)
+
+    @transition
+    def activate_iraq(self):
+        if self.iraq.active > 0.5:
+            return 0.0, lambda: None
+        delay = self.prior.sample("iraq.activation_delay", lu(*IRAQ_ACTIVATION_DELAY))
+        return 1.0 / delay, lambda: setattr(self.iraq, 'active', 1.0)
+
+    # ---------------------------------------------------------------
+    # Proxy degradation — Israel/US strikes reduce capacity
+    # ---------------------------------------------------------------
+
+    @transition
+    def iaf_strikes_hezbollah(self):
+        """IAF destroys Hezbollah launchers (no munition cost — aircraft + PGMs)."""
+        if self.hezb.active < 0.5 or self.hezb.launchers < 1:
+            return 0.0, lambda: None
+        rate = 1.0  # daily strikes
+        def effect():
+            kill_frac = self.prior.sample("hezb.launcher_kill_frac", lu(*HEZB_LAUNCHER_KILL_FRAC))
+            destroyed = self.hezb.launchers * kill_frac
+            self.hezb.launchers = max(0, self.hezb.launchers - destroyed)
+        return rate, effect
+
+    @transition
+    def us_strikes_houthis(self):
+        """CENTCOM strikes on Houthi launch sites — costs Tomahawks."""
+        if self.houthi.active < 0.5 or self.houthi.launch_sites < 1:
+            return 0.0, lambda: None
+        rate = 0.5  # every ~2 days
+        def effect():
+            if self.us.tomahawks < 5:
+                return
+            t_used = min(10, self.us.tomahawks)
+            self.us.tomahawks = max(0, self.us.tomahawks - t_used)
+            kill_frac = self.prior.sample("houthi.site_kill_frac", lu(*HOUTHI_SITE_KILL_FRAC))
+            destroyed = self.houthi.launch_sites * kill_frac
+            self.houthi.launch_sites = max(0, self.houthi.launch_sites - destroyed)
+        return rate, effect
+
+    @transition
+    def us_strikes_iraq_militias(self):
+        """US strikes on Iraqi militia cells."""
+        if self.iraq.active < 0.5 or self.iraq.cells < 1:
+            return 0.0, lambda: None
+        rate = 0.5
+        def effect():
+            kill_frac = self.prior.sample("iraq.cell_kill_frac", lu(*IRAQ_CELL_KILL_FRAC))
+            destroyed = self.iraq.cells * kill_frac
+            self.iraq.cells = max(0, self.iraq.cells - destroyed)
+        return rate, effect
+
+    # ---------------------------------------------------------------
+    # Hezbollah launches — draws Iron Dome, David's Sling
+    # ---------------------------------------------------------------
+
+    @transition
+    def hezb_sr_barrage(self):
+        """Hezbollah daily short-range rocket barrage → Iron Dome."""
+        if self.hezb.active < 0.5 or self.hezb.rockets_sr < 10 or self.hezb.launchers < 1:
+            return 0.0, lambda: None
+        rate = 1.0  # daily
+        def effect():
+            max_day = self.prior.sample("hezb.sr_per_day", lu(*HEZB_SR_PER_DAY))
+            launcher_cap = self.hezb.launchers * HEZB_ROCKETS_PER_LAUNCHER
+            n = min(self.hezb.rockets_sr, max_day, launcher_cap)
+            self.hezb.rockets_sr = max(0, self.hezb.rockets_sr - n)
+            # Iron Dome intercepts
+            pk = self.prior.sample("def.pk_vs_drone", lu(*PK_VS_DRONE))
+            killed = n * pk
+            iron_dome_used = min(killed, self.defense.iron_dome)
+            self.defense.iron_dome = max(0, self.defense.iron_dome - iron_dome_used)
+            leaked = n - killed
+            self.damage.missiles_intercepted += killed
+            self.damage.missiles_leaked += max(0, leaked)
+        return rate, effect
+
+    @transition
+    def hezb_mr_salvo(self):
+        """Hezbollah medium-range salvo → David's Sling."""
+        if self.hezb.active < 0.5 or self.hezb.rockets_mr < 5 or self.hezb.launchers < 5:
+            return 0.0, lambda: None
+        interval = self.prior.sample("hezb.mr_salvo_interval", lu(*HEZB_MR_SALVO_INTERVAL))
+        rate = 1.0 / interval
+        def effect():
+            n = min(self.hezb.rockets_mr,
+                    self.prior.sample("hezb.mr_per_salvo", lu(*HEZB_MR_PER_SALVO)))
+            self.hezb.rockets_mr = max(0, self.hezb.rockets_mr - n)
+            # David's Sling intercepts
+            pk = self.prior.sample("def.pk_vs_cruise", lu(*PK_VS_CRUISE))
+            killed = n * pk
+            ds_used = min(killed, self.defense.davids_sling)
+            self.defense.davids_sling = max(0, self.defense.davids_sling - ds_used)
+            leaked = n - killed
+            self.damage.missiles_intercepted += killed
+            self.damage.missiles_leaked += max(0, leaked)
+        return rate, effect
+
+    @transition
+    def hezb_pgm_strike(self):
+        """Hezbollah precision-guided missile strikes → David's Sling / Arrow-2."""
+        if self.hezb.active < 0.5 or self.hezb.pgm < 1 or self.hezb.launchers < 1:
+            return 0.0, lambda: None
+        interval = self.prior.sample("hezb.pgm_interval", lu(*HEZB_PGM_INTERVAL))
+        rate = 1.0 / interval
+        def effect():
+            n = min(self.hezb.pgm,
+                    self.prior.sample("hezb.pgm_per_strike", lu(*HEZB_PGM_PER_STRIKE)))
+            self.hezb.pgm = max(0, self.hezb.pgm - n)
+            remaining = n
+            # Arrow-2 engages first (these are ballistic-trajectory)
+            if self.defense.arrow2 > 0:
+                engaged = min(remaining * 0.3, self.defense.arrow2)
+                pk = self.prior.sample("def.pk_arrow2", lu(*PK_ARROW2))
+                self.defense.arrow2 = max(0, self.defense.arrow2 - engaged)
+                remaining -= engaged * pk
+            # David's Sling
+            if self.defense.davids_sling > 0:
+                engaged = min(remaining, self.defense.davids_sling)
+                pk = self.prior.sample("def.pk_vs_cruise", lu(*PK_VS_CRUISE))
+                self.defense.davids_sling = max(0, self.defense.davids_sling - engaged)
+                remaining -= engaged * pk
+            leaked = max(0, remaining)
+            self.damage.missiles_intercepted += n - leaked
+            self.damage.missiles_leaked += leaked
+        return rate, effect
+
+    # ---------------------------------------------------------------
+    # Houthi launches — BMs at Israel (Arrow/THAAD), drones at Gulf
+    # ---------------------------------------------------------------
+
+    @transition
+    def houthi_bm_salvo(self):
+        """Houthi BM salvo at Israel → Arrow-3 / THAAD."""
+        if self.houthi.active < 0.5 or self.houthi.bm < 1 or self.houthi.launch_sites < 1:
+            return 0.0, lambda: None
+        interval = self.prior.sample("houthi.bm_interval", lu(*HOUTHI_BM_INTERVAL))
+        rate = 1.0 / interval
+        def effect():
+            n = min(self.houthi.bm,
+                    self.prior.sample("houthi.bm_per_salvo", lu(*HOUTHI_BM_PER_SALVO)),
+                    self.houthi.launch_sites)  # can't fire more than sites available
+            self.houthi.bm = max(0, self.houthi.bm - n)
+            remaining = n
+            # Arrow-3
+            if self.defense.arrow3 > 0:
+                engaged = min(remaining, self.defense.arrow3)
+                pk = self.prior.sample("def.pk_arrow3", lu(*PK_ARROW3))
+                self.defense.arrow3 = max(0, self.defense.arrow3 - engaged)
+                remaining -= engaged * pk
+            # THAAD
+            if self.defense.thaad > 0:
+                engaged = min(remaining, self.defense.thaad)
+                pk = self.prior.sample("def.pk_thaad", lu(*PK_THAAD))
+                self.defense.thaad = max(0, self.defense.thaad - engaged)
+                remaining -= engaged * pk
+            leaked = max(0, remaining)
+            self.damage.missiles_intercepted += n - leaked
+            self.damage.missiles_leaked += leaked
+        return rate, effect
+
+    @transition
+    def houthi_drone_wave(self):
+        """Houthi daily drone/cruise wave → Iron Dome."""
+        if self.houthi.active < 0.5 or self.houthi.launch_sites < 1:
+            return 0.0, lambda: None
+        if self.houthi.drones < 2 and self.houthi.cruise < 1:
+            return 0.0, lambda: None
+        rate = 1.0  # daily
+        def effect():
+            n_drone = min(self.houthi.drones,
+                          self.prior.sample("houthi.drone_per_day", lu(*HOUTHI_DRONE_PER_DAY)))
+            self.houthi.drones = max(0, self.houthi.drones - n_drone)
+            pk = self.prior.sample("def.pk_vs_drone", lu(*PK_VS_DRONE))
+            killed = n_drone * pk
+            iron_dome_used = min(killed, self.defense.iron_dome)
+            self.defense.iron_dome = max(0, self.defense.iron_dome - iron_dome_used)
+            leaked = n_drone - killed
+            self.damage.missiles_intercepted += killed
+            self.damage.missiles_leaked += max(0, leaked)
+        return rate, effect
+
+    # ---------------------------------------------------------------
+    # Iraqi militia attacks → Gulf C-RAM / PAC-3
+    # ---------------------------------------------------------------
+
+    @transition
+    def iraq_attacks(self):
+        """Iraqi militia rockets/drones on US Gulf bases → C-RAM (no interceptor draw)."""
+        if self.iraq.active < 0.5 or self.iraq.rockets < 1 or self.iraq.cells < 1:
+            return 0.0, lambda: None
+        attacks_day = self.prior.sample("iraq.attacks_per_day", lu(*IRAQ_PER_DAY))
+        rate = attacks_day
+        def effect():
+            # Each event is one attack from one cell (~1-3 rockets)
+            n = min(self.iraq.rockets, 3)
+            self.iraq.rockets = max(0, self.iraq.rockets - n)
+            # C-RAM intercepts — no expensive interceptor draw
+            pk = self.prior.sample("def.pk_cram", lu(*PK_CRAM))
+            killed = n * pk
+            leaked = n - killed
+            self.damage.missiles_intercepted += killed
+            self.damage.missiles_leaked += max(0, leaked)
+        return rate, effect
 
     # --- Iran launches MRBM salvo at Israel ---
     @transition
@@ -465,8 +886,7 @@ class Conflict(StateGroup):
         if self.iran.tels < 1:
             return 0.0, lambda: None
 
-        interval = self.prior.sample("us.tel_strike_interval", lu(*US_TEL_STRIKE_INTERVAL))
-        rate = 1.0 / interval
+        rate = 1.0
 
         def effect():
             if self.us.tomahawks < 1 or self.us.jassm < 1:

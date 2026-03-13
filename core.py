@@ -173,7 +173,6 @@ class StateGroup:
         Returns a flat dict with dotted keys, e.g. 'iran.mrbm_depletion'.
         """
         snap = {}
-        prefix = type(self).__name__.lower()
         for name in dir(self):
             if name.startswith("_"):
                 continue
