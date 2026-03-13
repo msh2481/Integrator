@@ -116,9 +116,8 @@ def plot_time_series(runs, out_dir="reported"):
             continue
 
         # Compute mean trajectory (interpolate to common time grid)
-        max_len = max(len(ts) for ts in all_times)
-        ref_times = all_times[np.argmax([len(ts) for ts in all_times])]
-        t_grid = np.array(ref_times)
+        ref_idx = np.argmax([len(ts) for ts in all_times])
+        t_grid = np.array(all_times[ref_idx])
 
         # Stack all values onto the common grid (assumes same time points)
         matrix = []

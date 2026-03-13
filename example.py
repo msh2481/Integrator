@@ -242,6 +242,8 @@ class Interceptors(StateGroup):
         self.davids_sling = self.prior.sample("def.ds_init", lu(*DEFENSE_DS))
         self.iron_dome = self.prior.sample("def.iron_dome_init", lu(*DEFENSE_IRON_DOME))
 
+    @ode
+    def resupply(self):
         tamir_mo = self.prior.sample("def.tamir_resupply_mo", lu(*DEFENSE_TAMIR_RESUPPLY))
         pac3_mo = self.prior.sample("def.pac3_resupply_mo", lu(*DEFENSE_PAC3_RESUPPLY))
         arrow_mo = self.prior.sample("def.arrow_resupply_mo", lu(*DEFENSE_ARROW_RESUPPLY))

@@ -101,8 +101,6 @@ class StateGroup:
 
         # Initialize scalar fields from class defaults
         for name in self._fields:
-            if not hasattr(self, name) or isinstance(getattr(type(self), name, None), property):
-                pass  # will be set below only if class default exists
             for cls in type(self).__mro__:
                 if name in cls.__dict__ and not isinstance(cls.__dict__[name], property):
                     setattr(self, name, cls.__dict__[name])

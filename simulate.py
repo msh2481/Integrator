@@ -65,6 +65,7 @@ def _run_trajectory(world_template: StateGroup, t_end: float, dt: float,
     # Discover ODE and transition methods
     odes = world._collect_odes()
     transitions = world._collect_transitions()
+    n_transitions = len(transitions)
 
     # Initialize event log
     event_log: dict[str, list[float]] = {name: [] for name, _, _ in transitions}
@@ -120,8 +121,10 @@ def _run_trajectory(world_template: StateGroup, t_end: float, dt: float,
                     remaining -= tau
 
                     # Choose transition proportional to rate
-                    probs = np.array(rates) / total_rate
-                    idx = rng.choice(len(rates), p=probs)
+                    probs = np.empty(n_transitions)
+                    for _i, _r in enumerate(rates):
+                        probs[_i] = _r / total_rate
+                    idx = rng.choice(n_transitions, p=probs)
                     chosen_name, chosen_effect = trans_info[idx]
                     chosen_effect()
                     event_log[chosen_name].append(t)
