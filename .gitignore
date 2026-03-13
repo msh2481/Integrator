@@ -1,2 +1,2 @@
-result.csv
-poetry.lock
+.venv
+.claude
