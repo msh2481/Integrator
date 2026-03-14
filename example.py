@@ -28,16 +28,20 @@ from simulate import simulate
 #
 # Sources: IRAN_ARSENAL.md, IRAN_DOCTRINE.md, DEFENSE_SYSTEMS.md,
 #          US_OFFENSE.md
+# Calibrated against: github.com/danielrosehill/Iran-Israel-War-2026-OSINT-Data
 # ===================================================================
 
 # --- Iran: Initial Arsenal (count) ---
 # High end includes possibility of undisclosed stockpiles / surge production.
-# Total BM high end ~3k (MRBM+SRBM+cruise), drones ~50k.
 
-IRAN_MRBM = (1000, 2000)             # low: conservative OSINT; high: undisclosed + surge
-IRAN_SRBM = (1000, 6000)             # Fateh family is high-volume
-IRAN_CRUISE = (100, 500)            # Paveh/Hoveyzeh/Quds
-IRAN_DRONE = (2000, 50000)          # on-hand; high end = full wartime stockpile
+# OSINT: ~2,410 BMs fired in 13 days (TP4), conflict ongoing — must start above that
+IRAN_MRBM = (2000, 4000)
+# OSINT: SRBMs rarely identified in TP4 wave data; MRBMs dominate all fronts
+IRAN_SRBM = (500, 3000)
+# OSINT: only 4/42 TP4 waves used cruise missiles — clearly secondary weapon
+IRAN_CRUISE = (50, 300)
+# OSINT: ~3,560 drones in 13 days; 50k was speculative upper bound
+IRAN_DRONE = (3000, 20000)
 IRAN_TEL = (80, 200)                # all types
 
 # --- Iran: Production Rates (per year) ---
@@ -49,16 +53,23 @@ IRAN_DRONE_PROD = (2000, 10000)     # IISS baseline + expanded facilities
 
 # --- Iran: Salvo Parameters (natural units) ---
 
-IRAN_MRBM_SALVO_INTERVAL = (1, 7)   # days between MRBM salvos
-IRAN_MRBM_SALVO_FRAC = (0.01, 0.10) # fraction of available per salvo; Iran conserves stock
-IRAN_MRBM_MIN_SALVO = 20            # minimum salvo size (fixed)
+# OSINT: 40 BM waves in 13 days; Day 2 had 6 waves; median gap ~5 hrs
+IRAN_MRBM_SALVO_INTERVAL = (0.2, 1.0)
+# OSINT: ~60 BMs/wave avg from ~3k stock ≈ 2%; 10% salvos never observed
+IRAN_MRBM_SALVO_FRAC = (0.01, 0.05)
+# OSINT: Wave 12 had only 5 BMs; many small salvos in data
+IRAN_MRBM_MIN_SALVO = 5
 IRAN_MISSILES_PER_TEL = 2           # per salvo window (fixed)
 
-IRAN_SRBM_SALVO_INTERVAL = (1, 3)   # days between SRBM salvos
-IRAN_SRBM_PER_SALVO = (5, 25)       # missiles per salvo
+# OSINT: Gulf states hit almost daily with SRBMs
+IRAN_SRBM_SALVO_INTERVAL = (0.5, 2)
+# OSINT: Qatar Day 12: 9 BMs, UAE Day 11: 8 BMs, Saudi Day 12: 7 BMs
+IRAN_SRBM_PER_SALVO = (5, 15)
 
-IRAN_DRONES_PER_DAY = (10, 300)     # drones launched per day (continuous ops)
-IRAN_CRUISE_PER_DAY = (2, 40)       # cruise missiles launched per day
+# OSINT: ~274 drones/day avg; Wave 16 alone: 230 drones; low end of 10 impossible
+IRAN_DRONES_PER_DAY = (100, 500)
+# OSINT: only 4/42 waves used cruise missiles; negligible vs BMs + drones
+IRAN_CRUISE_PER_DAY = (0.5, 10)
 
 # --- Defense: Drone/Cruise Intercept Allocation ---
 
@@ -68,7 +79,8 @@ FRAC_CRUISE_PAC3 = (0.10, 0.40)      # fraction of cruise kills by PAC-3
 
 # --- Defense: Interceptor Inventories (count) ---
 
-DEFENSE_ARROW3 = (30, 120)
+# OSINT: Arrow-3 used in 14/42 TP4 waves, still operational Day 13; 30 would exhaust fast
+DEFENSE_ARROW3 = (50, 120)
 DEFENSE_ARROW2 = (80, 200)
 DEFENSE_THAAD = (48, 96)            # 1-2 batteries
 DEFENSE_PAC3 = (150, 600)
@@ -77,12 +89,14 @@ DEFENSE_IRON_DOME = (500, 5000)     # Tamir; huge range due to 2023-2025 drawdow
 
 # --- Defense: Intercept Probabilities (Pk) ---
 
-PK_ARROW3 = (0.60, 0.95)            # wide: MaRV degrades it heavily
+# OSINT: still intercepting MaRV missiles Day 13; Qatar "all intercepted" for BMs
+PK_ARROW3 = (0.70, 0.95)
 PK_ARROW2 = (0.70, 0.92)
 PK_THAAD = (0.80, 0.96)
 PK_PAC3_VS_BM = (0.60, 0.92)        # mixed combat data
 PK_PAC3_VS_SRBM = (0.80, 0.96)
-PK_VS_DRONE = (0.60, 0.98)          # huge range: depends on fighter availability
+# OSINT: UAE "mostly intercepted" ~1,200 drones; Day 14 reports 95% drone attrition
+PK_VS_DRONE = (0.80, 0.96)
 PK_VS_CRUISE = (0.65, 0.95)
 PK_CRAM = (0.30, 0.70)              # C-RAM vs rockets/drones; overwhelmed by swarms
 
@@ -118,8 +132,9 @@ GULF_PAC3_SHARE = (0.20, 0.50)       # Gulf's share of theater PAC-3 allocation
 
 # --- US Offensive (count) ---
 
-US_TOMAHAWK = (200, 600)
-US_JASSM = (300, 1500)
+# OSINT: ~2,000 targets struck with stand-off weapons by Day 5; deep stocks evident
+US_TOMAHAWK = (400, 800)
+US_JASSM = (500, 1500)
 
 # --- US: Resupply (per month) ---
 
@@ -128,14 +143,16 @@ US_JASSM_RESUPPLY = (50, 300)       # airlift from CONUS, limited by production
 
 # --- US: TEL Hunt ---
 
-US_TEL_KILL_FRAC = (0.1, 0.18)
+# OSINT: "surface launchers ~60% destroyed by Day 7" → (1-f)^7=0.4 → f≈0.12
+US_TEL_KILL_FRAC = (0.10, 0.15)
 US_TOMAHAWK_PER_TEL_STRIKE = (10, 40)
 US_JASSM_PER_TEL_STRIKE = (3, 20)
 
 # --- US: Production Facility Strikes ---
 
 US_PROD_STRIKE_INTERVAL = (0.5, 1)   # days between strikes
-US_PROD_STRIKE_EFFECT = (0.05, 0.30) # fraction of remaining capacity per strike
+# OSINT: 86% degradation by Day 5; (1-f)^7=0.14 → f≈0.25; low end 0.05 too weak
+US_PROD_STRIKE_EFFECT = (0.15, 0.30)
 US_TOMAHAWK_PER_PROD_STRIKE = (20, 60)
 US_JASSM_PER_PROD_STRIKE = (10, 40)
 
@@ -152,17 +169,22 @@ HEZB_MR_ROCKETS = (300, 1500)         # medium-range (Fajr-5/Khaibar/Zelzal); <1
 HEZB_PGM = (20, 200)                  # precision-guided (Fateh w/ guidance kits); <100 est.
 HEZB_DRONES = (200, 1000)             # Ababil/Shahed remnants
 
-HEZB_SR_PER_DAY = (50, 500)           # peak was ~250/day in Nov 2024; theoretical 1500
+# OSINT: Day 13 barrage of 150 rockets was described as major; 500 exceeds depleted capacity
+HEZB_SR_PER_DAY = (50, 200)
 HEZB_MR_SALVO_INTERVAL = (1, 5)       # days between MR salvos
 HEZB_MR_PER_SALVO = (5, 30)
-HEZB_PGM_INTERVAL = (2, 10)           # days between precision strikes
+# OSINT: two PGM strikes in 13 days (Dado Base Day 5, Ramle Day 10) ≈ every 5 days
+HEZB_PGM_INTERVAL = (3, 7)
 HEZB_PGM_PER_STRIKE = (1, 5)
 
 HEZB_LAUNCHERS = (100, 500)           # MRL vehicles + concealed launch sites
 HEZB_ROCKETS_PER_LAUNCHER = 10        # effective rockets per launcher per day
 
-HEZB_ACTIVATION_DELAY = (0.5, 5)      # days after conflict starts
-HEZB_LAUNCHER_KILL_FRAC = (0.02, 0.08)  # fraction of launchers destroyed per IAF strike-day
+# OSINT: Hezbollah active Day 3 (March 2) = exactly 2 days post-conflict start
+HEZB_ACTIVATION_DELAY = 2.0
+# OSINT: Day 5 "80 Hezb targets in 24hrs", ground invasion, drone factory destroyed;
+# Day 14: 773 killed, 759k displaced — IDF hit extremely hard
+HEZB_LAUNCHER_KILL_FRAC = (0.05, 0.12)
 
 # ===================================================================
 # Houthis (Ansar Allah, Yemen)
@@ -181,7 +203,8 @@ HOUTHI_BM_PER_SALVO = (1, 5)
 HOUTHI_DRONE_PER_DAY = (1, 10)        # demonstrated ~40/month ≈ 1.3/day sustained
 
 HOUTHI_LAUNCH_SITES = (10, 30)        # 14 mobile TELs confirmed; dispersed across 200km²
-HOUTHI_ACTIVATION_DELAY = (1, 14)     # may hold fire to conserve (observed Mar 2026)
+# OSINT: zero confirmed Houthi attacks through Day 15; deterred or conserving
+HOUTHI_ACTIVATION_DELAY = (10, 30)
 HOUTHI_SITE_KILL_FRAC = (0.005, 0.03) # hard to degrade (dispersed, mountainous terrain)
 
 HOUTHI_DRONE_PROD_PER_DAY = (1, 5)    # domestic assembly with Iranian components
@@ -195,8 +218,10 @@ HOUTHI_DRONE_PROD_PER_DAY = (1, 5)    # domestic assembly with Iranian component
 
 IRAQ_ROCKETS = (500, 2000)            # 107mm/122mm/Fajr + OWA drones
 IRAQ_CELLS = (20, 80)                # active militia launch cells
-IRAQ_PER_DAY = (1, 10)               # attacks per day on US bases
-IRAQ_ACTIVATION_DELAY = (1, 7)
+# OSINT: 6 attacks in 13 days (Day 2,7,10,12,13,15) ≈ 0.46/day; not daily
+IRAQ_PER_DAY = (0.3, 2)
+# OSINT: Erbil hotel drone strike on Day 2 — clear and specific
+IRAQ_ACTIVATION_DELAY = 2.0
 IRAQ_CELL_KILL_FRAC = (0.01, 0.05)   # US strikes on militia positions
 IRAQ_RESUPPLY_PER_DAY = (2, 20)       # overland from Iran; hard to interdict
 
@@ -499,6 +524,7 @@ class Conflict(StateGroup):
     iraq: IraqiMilitias
     damage: Damage
 
+    t: float = 0.0        # simulation clock (days)
     outcome: float = 0.0  # +1 = US wins, -1 = Iran wins, 0 = undecided
 
     @property
@@ -525,15 +551,17 @@ class Conflict(StateGroup):
         return 0.0, lambda: None
 
     # ---------------------------------------------------------------
-    # Proxy activation — Iran turns on each front stochastically
+    # Clock + deterministic proxy activation
+    # OSINT: Hezbollah Day 3, Iraq Day 2 — fixed times, not stochastic
     # ---------------------------------------------------------------
 
-    @transition
-    def activate_hezbollah(self):
-        if self.hezb.active > 0.5:
-            return 0.0, lambda: None
-        delay = self.prior.sample("hezb.activation_delay", lu(*HEZB_ACTIVATION_DELAY))
-        return 1.0 / delay, lambda: setattr(self.hezb, 'active', 1.0)
+    @ode
+    def clock(self):
+        if self.t >= HEZB_ACTIVATION_DELAY and self.hezb.active < 0.5:
+            self.hezb.active = 1.0
+        if self.t >= IRAQ_ACTIVATION_DELAY and self.iraq.active < 0.5:
+            self.iraq.active = 1.0
+        return {"t": 1.0}
 
     @transition
     def activate_houthis(self):
@@ -541,13 +569,6 @@ class Conflict(StateGroup):
             return 0.0, lambda: None
         delay = self.prior.sample("houthi.activation_delay", lu(*HOUTHI_ACTIVATION_DELAY))
         return 1.0 / delay, lambda: setattr(self.houthi, 'active', 1.0)
-
-    @transition
-    def activate_iraq(self):
-        if self.iraq.active > 0.5:
-            return 0.0, lambda: None
-        delay = self.prior.sample("iraq.activation_delay", lu(*IRAQ_ACTIVATION_DELAY))
-        return 1.0 / delay, lambda: setattr(self.iraq, 'active', 1.0)
 
     # ---------------------------------------------------------------
     # Proxy degradation — Israel/US strikes reduce capacity
@@ -939,7 +960,7 @@ class Conflict(StateGroup):
 
 if __name__ == "__main__":
     workers = int(sys.argv[1]) if len(sys.argv) > 1 else 8
-    t_end = 300.0  # 300 days
+    t_end = 100.0
     output_file = "runs.jsonl"
     total = 0
 
