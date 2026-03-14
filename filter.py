@@ -58,20 +58,23 @@ def prior(run, name):
 # ===================================================================
 
 FILTERS = [
-    # # By day 10, Iran has 20-40% of TELs remaining
-    # lambda r: (
-    #     (init := reported_at(r, 0, "iran.n_tels")) is not None
-    #     and init > 0
-    #     and (tel := reported_at(r, 10, "iran.n_tels")) is not None
-    #     and 0.20 <= tel / init <= 0.40
-    # ),
-
-    # By day 10, Gulf interceptors are 30-50% depleted
+    # OSINT: ~23 Israeli casualties (killed+injured) by Day 2
+    # Allow 2x range for reporting uncertainty
     lambda r: (
-        (init := reported_at(r, 0, "gulf.total_interceptors")) is not None
-        and init > 0
-        and (cur := reported_at(r, 10, "gulf.total_interceptors")) is not None
-        and 0.30 <= 1 - cur / init <= 0.50
+        (cas := reported_at(r, 2, "damage.il_casualties")) is not None
+        and 10 <= cas <= 50
+    ),
+
+    # OSINT: ~105 Israeli casualties (killed+injured) by Day 10
+    lambda r: (
+        (cas := reported_at(r, 10, "damage.il_casualties")) is not None
+        and 50 <= cas <= 150
+    ),
+
+    # OSINT: ~125 Israeli casualties (killed+injured) by Day 13
+    lambda r: (
+        (cas := reported_at(r, 13, "damage.il_casualties")) is not None
+        and 100 <= cas <= 150
     ),
 ]
 

@@ -65,8 +65,6 @@ def _run_trajectory(world_template: StateGroup, t_end: float, dt: float,
     # Discover ODE and transition methods
     odes = world._collect_odes()
     transitions = world._collect_transitions()
-    n_transitions = len(transitions)
-
     # Initialize event log
     event_log: dict[str, list[float]] = {name: [] for name, _, _ in transitions}
 
@@ -86,19 +84,21 @@ def _run_trajectory(world_template: StateGroup, t_end: float, dt: float,
         remaining = min(dt, t_end - t)
 
         while remaining > 1e-12:
-            # Evaluate transition rates
+            # Evaluate transition rates (skip zero-rate transitions)
             rates = []
             trans_info = []
+            total_rate = 0.0
             for name, group, method in transitions:
                 rate, effect = method()
+                if rate == 0.0:
+                    continue
                 if not math.isfinite(rate) or rate < 0:
                     raise ValueError(
                         f"Invalid rate {rate} from transition '{name}'"
                     )
                 rates.append(rate)
+                total_rate += rate
                 trans_info.append((name, effect))
-
-            total_rate = sum(rates)
 
             if total_rate == 0:
                 # No transitions possible — advance full remaining
@@ -121,10 +121,11 @@ def _run_trajectory(world_template: StateGroup, t_end: float, dt: float,
                     remaining -= tau
 
                     # Choose transition proportional to rate
-                    probs = np.empty(n_transitions)
+                    n_active = len(rates)
+                    probs = np.empty(n_active)
                     for _i, _r in enumerate(rates):
                         probs[_i] = _r / total_rate
-                    idx = rng.choice(n_transitions, p=probs)
+                    idx = rng.choice(n_active, p=probs)
                     chosen_name, chosen_effect = trans_info[idx]
                     chosen_effect()
                     event_log[chosen_name].append(t)

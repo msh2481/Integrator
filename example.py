@@ -53,10 +53,10 @@ IRAN_DRONE_PROD = (2000, 10000)     # IISS baseline + expanded facilities
 
 # --- Iran: Salvo Parameters (natural units) ---
 
-# OSINT: 40 BM waves in 13 days; Day 2 had 6 waves; median gap ~5 hrs
-IRAN_MRBM_SALVO_INTERVAL = (0.2, 1.0)
-# OSINT: ~60 BMs/wave avg from ~3k stock ≈ 2%; 10% salvos never observed
-IRAN_MRBM_SALVO_FRAC = (0.01, 0.05)
+# OSINT: 40 BM waves in 13 days = 3/day → 0.33 day interval (fixed)
+IRAN_MRBM_SALVO_INTERVAL = 0.33
+# OSINT: ~60 BMs/wave from ~3k stock = 2% per salvo (fixed)
+IRAN_MRBM_SALVO_FRAC = 0.02
 # OSINT: Wave 12 had only 5 BMs; many small salvos in data
 IRAN_MRBM_MIN_SALVO = 5
 IRAN_MISSILES_PER_TEL = 2           # per salvo window (fixed)
@@ -79,26 +79,44 @@ FRAC_CRUISE_PAC3 = (0.10, 0.40)      # fraction of cruise kills by PAC-3
 
 # --- Defense: Interceptor Inventories (count) ---
 
-# OSINT: Arrow-3 used in 14/42 TP4 waves, still operational Day 13; 30 would exhaust fast
-DEFENSE_ARROW3 = (50, 120)
-DEFENSE_ARROW2 = (80, 200)
-DEFENSE_THAAD = (48, 96)            # 1-2 batteries
-DEFENSE_PAC3 = (150, 600)
-DEFENSE_DS = (50, 300)              # David's Sling Stunner
-DEFENSE_IRON_DOME = (500, 5000)     # Tamir; huge range due to 2023-2025 drawdown
+# Sources: CSIS depleting inventory report, FPRI "Shallow Ramparts" analysis,
+# CNN/WSJ reporting on TP3 interceptor usage, battery counts × interceptors/launcher.
+# TP3 (Jun 2025) used ~131 Arrow-3, 100-150 THAAD, ~80 SM-3; Israel replenishing since.
+DEFENSE_ARROW3 = (80, 200)          # replenished post-TP3 but not fully; accelerated IAI production
+DEFENSE_ARROW2 = (50, 150)          # old stock, no longer in production; depleting
+DEFENSE_THAAD = (96, 200)           # 2 batteries (96 on launchers) + theater reload stock
+DEFENSE_PAC3 = (200, 500)           # US-provided; 600+ MSE delivered in 2025; multiple batteries
+DEFENSE_DS = (50, 150)              # only 2 batteries; 6-12 Stunners per TEL; $1M each
+DEFENSE_IRON_DOME = (2000, 5000)    # 10 batteries + massive US-funded resupply ($5.2B for AD)
+# OSINT: Aegis SM-3 used in 5/42 TP4 waves; 414 in MDA arsenal Dec 2025 minus ~80 used in TP3
+DEFENSE_SM3 = (30, 80)              # 2-3 Aegis destroyers in theater × 10-15 SM-3 each
 
 # --- Defense: Intercept Probabilities (Pk) ---
 
 # OSINT: still intercepting MaRV missiles Day 13; Qatar "all intercepted" for BMs
-PK_ARROW3 = (0.70, 0.95)
+PK_ARROW3 = (0.85, 0.95)
 PK_ARROW2 = (0.70, 0.92)
 PK_THAAD = (0.80, 0.96)
 PK_PAC3_VS_BM = (0.60, 0.92)        # mixed combat data
 PK_PAC3_VS_SRBM = (0.80, 0.96)
+# OSINT: SM-3 exoatmospheric intercepts confirmed TP4 Wave 1; similar Pk to Arrow-3
+PK_SM3 = (0.70, 0.95)
+ENGAGE_FRAC_SM3 = (0.10, 0.30)      # limited ships, can't engage everything
 # OSINT: UAE "mostly intercepted" ~1,200 drones; Day 14 reports 95% drone attrition
 PK_VS_DRONE = (0.80, 0.96)
 PK_VS_CRUISE = (0.65, 0.95)
 PK_CRAM = (0.30, 0.70)              # C-RAM vs rockets/drones; overwhelmed by swarms
+
+# --- Defense: Targeting Split & Threat Filtering ---
+# OSINT: Israel targeted in 37/42 waves, but Gulf states also heavily targeted.
+# Many MRBMs go to Gulf/other countries, not just Israel.
+MRBM_ISRAEL_FRAC = (0.40, 0.70)     # fraction of each MRBM salvo aimed at Israel (rest at Gulf etc.)
+# Israel's BMD tracks each warhead's predicted impact point and only engages
+# those heading toward populated/critical zones. Missiles heading for open ground
+# (Negev desert, missed targets due to CEP/GPS jamming) are ignored.
+# Core Iron Dome design principle, applied across all layers.
+BM_THREAT_FRAC = (0.30, 0.60)       # of Israel-bound BMs, fraction warranting interception
+SRBM_THREAT_FRAC = (0.40, 0.70)     # SRBMs at Gulf — bases are denser targets, higher frac
 
 # --- Defense: Engagement Fractions per Layer ---
 
@@ -155,6 +173,28 @@ US_PROD_STRIKE_INTERVAL = (0.5, 1)   # days between strikes
 US_PROD_STRIKE_EFFECT = (0.15, 0.30)
 US_TOMAHAWK_PER_PROD_STRIKE = (20, 60)
 US_JASSM_PER_PROD_STRIKE = (10, 40)
+
+# --- US: Air Superiority (SEAD completion) ---
+# OSINT: Day 5-7 US shifts from Tomahawk/JASSM to gravity bombs (JDAM/BLU-109)
+# after Iranian air defenses destroyed. Once prod_capacity below this threshold,
+# strikes are "free" (gravity bombs from aircraft, no standoff munition cost).
+SEAD_THRESHOLD = (0.20, 0.40)       # prod_capacity below this → air superiority
+
+# --- Casualties ---
+# OSINT: ~16 Israeli civilians killed by Day 11 from BM impacts + cluster warheads
+CASUALTIES_PER_LEAKED_BM = (0.5, 3.0)       # Israeli casualties per BM that gets through
+CASUALTIES_PER_CLUSTER_INTERCEPT = (0.1, 0.5) # cluster submunitions even on "intercept"
+CLUSTER_WARHEAD_FRAC = (0.10, 0.30)          # fraction of BMs with cluster warheads (Day 7+)
+CLUSTER_START_DAY = 7                        # OSINT: cluster warheads first deployed Day 7
+DRONE_LETHALITY_VS_BM = 0.2                  # drone casualty rate relative to BM
+CRUISE_LETHALITY_VS_BM = 0.5                 # cruise missile casualty rate relative to BM
+ARROW3_PRODUCTION_SHARE = 0.4                # ~40% of Arrow production is Arrow-3, 60% Arrow-2
+# OSINT: Gulf damage per leaked missile, in $M USD (best-effort estimate)
+# Anchors: BAPCO refinery $200-500M, ADNOC Ruwais $500M+, 5x KC-135 $200M,
+# Dubai/Kuwait airports $50-100M/day, residential $5-50M.
+# Most leaked BMs/drones hit a mix of military, energy, civilian.
+GULF_DAMAGE_PER_LEAKED_BM = (50, 500)     # $M per leaked BM — high variance, energy infra skews up
+GULF_DAMAGE_PER_LEAKED_DRONE = (5, 50)    # $M per leaked drone — lower warhead, less structural
 
 
 # ===================================================================
@@ -230,6 +270,7 @@ IRAQ_RESUPPLY_PER_DAY = (2, 20)       # overland from Iran; hard to interdict
 # Helper
 # ===================================================================
 
+_NOOP = lambda: None
 _lu_cache = {}
 
 def lu(low, high):
@@ -328,17 +369,18 @@ class Interceptors(StateGroup):
     pac3: float = 0.0
     davids_sling: float = 0.0
     iron_dome: float = 0.0
+    sm3: float = 0.0                # Aegis BMD / SM-3 (sea-based)
 
     @property
     @reported
     def total_interceptors(self):
-        return self.arrow3 + self.arrow2 + self.thaad + self.pac3 + self.davids_sling + self.iron_dome
+        return self.arrow3 + self.arrow2 + self.thaad + self.pac3 + self.davids_sling + self.iron_dome + self.sm3
 
     @property
     @reported
     def bm_interceptors(self):
         """Interceptors that can engage ballistic missiles."""
-        return self.arrow3 + self.arrow2 + self.thaad + self.pac3
+        return self.arrow3 + self.arrow2 + self.thaad + self.pac3 + self.sm3
 
     def _init_state(self):
         self.arrow3 = self.prior.sample("def.arrow3_init", lu(*DEFENSE_ARROW3))
@@ -347,6 +389,7 @@ class Interceptors(StateGroup):
         self.pac3 = self.prior.sample("def.pac3_init", lu(*DEFENSE_PAC3))
         self.davids_sling = self.prior.sample("def.ds_init", lu(*DEFENSE_DS))
         self.iron_dome = self.prior.sample("def.iron_dome_init", lu(*DEFENSE_IRON_DOME))
+        self.sm3 = self.prior.sample("def.sm3_init", lu(*DEFENSE_SM3))
 
     @ode
     def resupply(self):
@@ -371,8 +414,8 @@ class Interceptors(StateGroup):
             "pac3": pac3_yr * pac3_share * (1 - gulf_share) / 365,
             "thaad": thaad_yr * thaad_share / 365,
             "davids_sling": ds_yr * ds_share / 365,
-            "arrow2": arrow_yr / 365 * 0.6,  # ~60% Arrow-2, 40% Arrow-3
-            "arrow3": arrow_yr / 365 * 0.4,
+            "arrow2": arrow_yr / 365 * (1 - ARROW3_PRODUCTION_SHARE),
+            "arrow3": arrow_yr / 365 * ARROW3_PRODUCTION_SHARE,
         }
 
 
@@ -501,12 +544,24 @@ class IraqiMilitias(StateGroup):
 class Damage(StateGroup):
     missiles_intercepted: float = 0.0
     missiles_leaked: float = 0.0
+    israeli_casualties: float = 0.0   # civilian casualties from BM impacts + cluster
+    gulf_damage: float = 0.0          # $M USD cumulative Gulf infrastructure/economic damage
 
     @property
     @reported
     def intercept_rate(self):
         total = self.missiles_intercepted + self.missiles_leaked
         return self.missiles_intercepted / total if total > 0 else 0.0
+
+    @property
+    @reported
+    def il_casualties(self):
+        return self.israeli_casualties
+
+    @property
+    @reported
+    def gulf_dmg(self):
+        return self.gulf_damage
 
 
 
@@ -536,19 +591,19 @@ class Conflict(StateGroup):
     def us_victory(self):
         """US wins when Iran's production is crippled and MRBM+SRBM stock near zero."""
         if self.outcome != 0:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         if (self.iran.production_capacity < 0.01 and self.iran.mrbm < 10 and self.iran.srbm < 10) or self.iran.n_tels < 5:
             return 1000.0, lambda: setattr(self, 'outcome', 1.0)
-        return 0.0, lambda: None
+        return 0.0, _NOOP
 
     @transition
     def iran_victory(self):
         """Iran wins when coalition BM interceptors are essentially exhausted."""
         if self.outcome != 0:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         if self.defense.bm_interceptors < 10:
             return 1000.0, lambda: setattr(self, 'outcome', -1.0)
-        return 0.0, lambda: None
+        return 0.0, _NOOP
 
     # ---------------------------------------------------------------
     # Clock + deterministic proxy activation
@@ -566,7 +621,7 @@ class Conflict(StateGroup):
     @transition
     def activate_houthis(self):
         if self.houthi.active > 0.5:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         delay = self.prior.sample("houthi.activation_delay", lu(*HOUTHI_ACTIVATION_DELAY))
         return 1.0 / delay, lambda: setattr(self.houthi, 'active', 1.0)
 
@@ -578,7 +633,7 @@ class Conflict(StateGroup):
     def iaf_strikes_hezbollah(self):
         """IAF destroys Hezbollah launchers (no munition cost — aircraft + PGMs)."""
         if self.hezb.active < 0.5 or self.hezb.launchers < 1:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         rate = 1.0  # daily strikes
         def effect():
             kill_frac = self.prior.sample("hezb.launcher_kill_frac", lu(*HEZB_LAUNCHER_KILL_FRAC))
@@ -590,7 +645,7 @@ class Conflict(StateGroup):
     def us_strikes_houthis(self):
         """CENTCOM strikes on Houthi launch sites — costs Tomahawks."""
         if self.houthi.active < 0.5 or self.houthi.launch_sites < 1:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         rate = 0.5  # every ~2 days
         def effect():
             if self.us.tomahawks < 5:
@@ -606,7 +661,7 @@ class Conflict(StateGroup):
     def us_strikes_iraq_militias(self):
         """US strikes on Iraqi militia cells."""
         if self.iraq.active < 0.5 or self.iraq.cells < 1:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         rate = 0.5
         def effect():
             kill_frac = self.prior.sample("iraq.cell_kill_frac", lu(*IRAQ_CELL_KILL_FRAC))
@@ -622,7 +677,7 @@ class Conflict(StateGroup):
     def hezb_sr_barrage(self):
         """Hezbollah daily short-range rocket barrage → Iron Dome."""
         if self.hezb.active < 0.5 or self.hezb.rockets_sr < 10 or self.hezb.launchers < 1:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         rate = 1.0  # daily
         def effect():
             max_day = self.prior.sample("hezb.sr_per_day", lu(*HEZB_SR_PER_DAY))
@@ -643,7 +698,7 @@ class Conflict(StateGroup):
     def hezb_mr_salvo(self):
         """Hezbollah medium-range salvo → David's Sling."""
         if self.hezb.active < 0.5 or self.hezb.rockets_mr < 5 or self.hezb.launchers < 5:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         interval = self.prior.sample("hezb.mr_salvo_interval", lu(*HEZB_MR_SALVO_INTERVAL))
         rate = 1.0 / interval
         def effect():
@@ -664,7 +719,7 @@ class Conflict(StateGroup):
     def hezb_pgm_strike(self):
         """Hezbollah precision-guided missile strikes → David's Sling / Arrow-2."""
         if self.hezb.active < 0.5 or self.hezb.pgm < 1 or self.hezb.launchers < 1:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         interval = self.prior.sample("hezb.pgm_interval", lu(*HEZB_PGM_INTERVAL))
         rate = 1.0 / interval
         def effect():
@@ -674,7 +729,8 @@ class Conflict(StateGroup):
             remaining = n
             # Arrow-2 engages first (these are ballistic-trajectory)
             if self.defense.arrow2 > 0:
-                engaged = min(remaining * 0.3, self.defense.arrow2)
+                f = self.prior.sample("def.engage_frac_arrow2", lu(*ENGAGE_FRAC_ARROW2))
+                engaged = min(remaining * f, self.defense.arrow2)
                 pk = self.prior.sample("def.pk_arrow2", lu(*PK_ARROW2))
                 self.defense.arrow2 = max(0, self.defense.arrow2 - engaged)
                 remaining -= engaged * pk
@@ -697,7 +753,7 @@ class Conflict(StateGroup):
     def houthi_bm_salvo(self):
         """Houthi BM salvo at Israel → Arrow-3 / THAAD."""
         if self.houthi.active < 0.5 or self.houthi.bm < 1 or self.houthi.launch_sites < 1:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         interval = self.prior.sample("houthi.bm_interval", lu(*HOUTHI_BM_INTERVAL))
         rate = 1.0 / interval
         def effect():
@@ -725,11 +781,11 @@ class Conflict(StateGroup):
 
     @transition
     def houthi_drone_wave(self):
-        """Houthi daily drone/cruise wave → Iron Dome."""
+        """Houthi daily drone/cruise wave → Iron Dome. Targets Israel."""
         if self.houthi.active < 0.5 or self.houthi.launch_sites < 1:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         if self.houthi.drones < 2 and self.houthi.cruise < 1:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         rate = 1.0  # daily
         def effect():
             n_drone = min(self.houthi.drones,
@@ -739,9 +795,12 @@ class Conflict(StateGroup):
             killed = n_drone * pk
             iron_dome_used = min(killed, self.defense.iron_dome)
             self.defense.iron_dome = max(0, self.defense.iron_dome - iron_dome_used)
-            leaked = n_drone - killed
+            leaked = max(0, n_drone - killed)
             self.damage.missiles_intercepted += killed
-            self.damage.missiles_leaked += max(0, leaked)
+            self.damage.missiles_leaked += leaked
+            # Drone leakers cause Israeli casualties (lower per-drone than per-BM)
+            cas_per = self.prior.sample("cas.per_leaked_bm", lu(*CASUALTIES_PER_LEAKED_BM))
+            self.damage.israeli_casualties += leaked * cas_per * DRONE_LETHALITY_VS_BM
         return rate, effect
 
     # ---------------------------------------------------------------
@@ -752,7 +811,7 @@ class Conflict(StateGroup):
     def iraq_attacks(self):
         """Iraqi militia rockets/drones on US Gulf bases → C-RAM (no interceptor draw)."""
         if self.iraq.active < 0.5 or self.iraq.rockets < 1 or self.iraq.cells < 1:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
         attacks_day = self.prior.sample("iraq.attacks_per_day", lu(*IRAQ_PER_DAY))
         rate = attacks_day
         def effect():
@@ -762,9 +821,12 @@ class Conflict(StateGroup):
             # C-RAM intercepts — no expensive interceptor draw
             pk = self.prior.sample("def.pk_cram", lu(*PK_CRAM))
             killed = n * pk
-            leaked = n - killed
+            leaked = max(0, n - killed)
             self.damage.missiles_intercepted += killed
-            self.damage.missiles_leaked += max(0, leaked)
+            self.damage.missiles_leaked += leaked
+            # Gulf damage from militia attacks ($M USD) — smaller warheads than SRBMs
+            dmg_per = self.prior.sample("cas.gulf_dmg_per_drone", lu(*GULF_DAMAGE_PER_LEAKED_DRONE))
+            self.damage.gulf_damage += leaked * dmg_per
         return rate, effect
 
     # --- Iran launches MRBM salvo at Israel ---
@@ -772,18 +834,51 @@ class Conflict(StateGroup):
     def iran_ballistic_salvo(self):
         available = min(self.iran.mrbm, self.iran.tels * IRAN_MISSILES_PER_TEL)
         if available < IRAN_MRBM_MIN_SALVO:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
 
-        interval = self.prior.sample("iran.mrbm_salvo_interval", lu(*IRAN_MRBM_SALVO_INTERVAL))
-        rate = 1.0 / interval
+        rate = 1.0 / IRAN_MRBM_SALVO_INTERVAL
 
         def effect():
-            frac = self.prior.sample("iran.mrbm_salvo_frac", lu(*IRAN_MRBM_SALVO_FRAC))
+            frac = IRAN_MRBM_SALVO_FRAC
             salvo = max(IRAN_MRBM_MIN_SALVO, self.iran.mrbm * frac)
             salvo = min(salvo, self.iran.mrbm, self.iran.tels * IRAN_MISSILES_PER_TEL)
             self.iran.mrbm = max(0, self.iran.mrbm - salvo)
 
-            remaining = salvo
+            # Split: fraction aimed at Israel vs Gulf/other targets
+            il_frac = self.prior.sample("iran.mrbm_israel_frac", lu(*MRBM_ISRAEL_FRAC))
+            at_israel = salvo * il_frac
+            at_gulf = salvo - at_israel
+
+            # Gulf-bound MRBMs: route through actual GulfDefense interceptors
+            gulf_remaining = at_gulf
+            if self.gulf.thaad > 0:
+                f = self.prior.sample("def.engage_frac_thaad", lu(*ENGAGE_FRAC_THAAD))
+                engaged = min(gulf_remaining * f, self.gulf.thaad)
+                pk = self.prior.sample("def.pk_thaad", lu(*PK_THAAD))
+                self.gulf.thaad = max(0, self.gulf.thaad - engaged)
+                gulf_remaining -= engaged * pk
+            if self.gulf.pac3 > 0:
+                engaged_targets = min(gulf_remaining, self.gulf.pac3 / 2)
+                pk = self.prior.sample("def.pk_pac3_bm", lu(*PK_PAC3_VS_BM))
+                self.gulf.pac3 = max(0, self.gulf.pac3 - engaged_targets * 2)
+                gulf_remaining -= engaged_targets * pk
+            gulf_leaked = max(0, gulf_remaining)
+            dmg_per = self.prior.sample("cas.gulf_dmg_per_bm", lu(*GULF_DAMAGE_PER_LEAKED_BM))
+            self.damage.gulf_damage += gulf_leaked * dmg_per
+
+            # Israel-bound: threat filtering — only engage BMs heading for valuable targets
+            threat_frac = self.prior.sample("def.bm_threat_frac", lu(*BM_THREAT_FRAC))
+            engaged_total = at_israel * threat_frac  # BMs that defense tries to intercept
+
+            remaining = engaged_total
+
+            # SM-3 (sea-based exoatmospheric, fires alongside Arrow-3)
+            if self.defense.sm3 > 0:
+                f = self.prior.sample("def.engage_frac_sm3", lu(*ENGAGE_FRAC_SM3))
+                engaged = min(remaining * f, self.defense.sm3)
+                pk = self.prior.sample("def.pk_sm3", lu(*PK_SM3))
+                self.defense.sm3 = max(0, self.defense.sm3 - engaged)
+                remaining -= engaged * pk
 
             # Arrow-3 (exo-atmospheric, first shot)
             if self.defense.arrow3 > 0:
@@ -816,9 +911,21 @@ class Conflict(StateGroup):
                 self.defense.pac3 = max(0, self.defense.pac3 - engaged_targets * 2)
                 remaining -= engaged_targets * pk
 
-            leaked = max(0, remaining)
-            self.damage.missiles_intercepted += salvo - leaked
-            self.damage.missiles_leaked += leaked
+            leaked_engaged = max(0, remaining)  # engaged BMs that got through defense
+            intercepted = engaged_total - leaked_engaged
+            self.damage.missiles_intercepted += intercepted
+            self.damage.missiles_leaked += leaked_engaged
+
+            # Israeli casualties: only from BMs that leaked through defense toward targets
+            cas_per = self.prior.sample("cas.per_leaked_bm", lu(*CASUALTIES_PER_LEAKED_BM))
+            self.damage.israeli_casualties += leaked_engaged * cas_per
+
+            # Cluster warhead casualties even on intercept (submunitions scatter)
+            if self.t >= CLUSTER_START_DAY:
+                cluster_frac = self.prior.sample("cas.cluster_frac", lu(*CLUSTER_WARHEAD_FRAC))
+                cas_cluster = self.prior.sample("cas.per_cluster_intercept",
+                    lu(*CASUALTIES_PER_CLUSTER_INTERCEPT))
+                self.damage.israeli_casualties += intercepted * cluster_frac * cas_cluster
 
         return rate, effect
 
@@ -826,7 +933,7 @@ class Conflict(StateGroup):
     @transition
     def iran_drone_cruise(self):
         if self.iran.drones < 10 and self.iran.cruise < 2:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
 
         rate = 1.0  # once per day
 
@@ -862,13 +969,18 @@ class Conflict(StateGroup):
             self.damage.missiles_intercepted += (n_drones + n_cruise) - total_leaked
             self.damage.missiles_leaked += total_leaked
 
+            # Israeli casualties from leaked drones/cruise (lower lethality than BMs)
+            cas_per = self.prior.sample("cas.per_leaked_bm", lu(*CASUALTIES_PER_LEAKED_BM))
+            self.damage.israeli_casualties += max(0, drone_leaked) * cas_per * DRONE_LETHALITY_VS_BM
+            self.damage.israeli_casualties += max(0, cruise_leaked) * cas_per * CRUISE_LETHALITY_VS_BM
+
         return rate, effect
 
     # --- Iran launches SRBMs at US Gulf bases ---
     @transition
     def iran_srbm_salvo(self):
         if self.iran.srbm < 10:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
 
         interval = self.prior.sample("iran.srbm_salvo_interval", lu(*IRAN_SRBM_SALVO_INTERVAL))
         rate = 1.0 / interval
@@ -878,7 +990,9 @@ class Conflict(StateGroup):
                 self.prior.sample("iran.srbm_per_salvo", lu(*IRAN_SRBM_PER_SALVO)))
             self.iran.srbm = max(0, self.iran.srbm - salvo)
 
-            remaining = salvo
+            # Threat filtering — Gulf bases are denser targets than Israel open areas
+            threat_frac = self.prior.sample("def.srbm_threat_frac", lu(*SRBM_THREAT_FRAC))
+            remaining = salvo * threat_frac
 
             # Gulf THAAD (upper tier)
             if self.gulf.thaad > 0:
@@ -899,30 +1013,40 @@ class Conflict(StateGroup):
             self.damage.missiles_intercepted += salvo - leaked
             self.damage.missiles_leaked += leaked
 
+            # Gulf economic/infrastructure damage from leaked SRBMs ($M USD)
+            dmg_per = self.prior.sample("cas.gulf_dmg_per_bm", lu(*GULF_DAMAGE_PER_LEAKED_BM))
+            self.damage.gulf_damage += leaked * dmg_per
+
         return rate, effect
 
     # --- US strikes Iranian TELs ---
     @transition
     def us_strikes_tels(self):
         if self.iran.tels < 1:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
 
         rate = 1.0
 
         def effect():
-            if self.us.tomahawks < 1 or self.us.jassm < 1:
-                return
+            # OSINT: after SEAD complete (~Day 5-7), US uses gravity bombs — no standoff cost
+            sead_thresh = self.prior.sample("us.sead_threshold", lu(*SEAD_THRESHOLD))
+            air_superiority = self.iran.production_capacity < sead_thresh
+
+            if not air_superiority:
+                if self.us.tomahawks < 1 or self.us.jassm < 1:
+                    return
 
             kill_frac = self.prior.sample("us.tel_kill_frac", lu(*US_TEL_KILL_FRAC))
             destroyed = self.iran.tels * kill_frac
             self.iran.tels = max(0, self.iran.tels - destroyed)
 
-            t_used = min(self.prior.sample("us.tomahawk_per_tel_strike",
-                lu(*US_TOMAHAWK_PER_TEL_STRIKE)), self.us.tomahawks)
-            j_used = min(self.prior.sample("us.jassm_per_tel_strike",
-                lu(*US_JASSM_PER_TEL_STRIKE)), self.us.jassm)
-            self.us.tomahawks = max(0, self.us.tomahawks - t_used)
-            self.us.jassm = max(0, self.us.jassm - j_used)
+            if not air_superiority:
+                t_used = min(self.prior.sample("us.tomahawk_per_tel_strike",
+                    lu(*US_TOMAHAWK_PER_TEL_STRIKE)), self.us.tomahawks)
+                j_used = min(self.prior.sample("us.jassm_per_tel_strike",
+                    lu(*US_JASSM_PER_TEL_STRIKE)), self.us.jassm)
+                self.us.tomahawks = max(0, self.us.tomahawks - t_used)
+                self.us.jassm = max(0, self.us.jassm - j_used)
 
         return rate, effect
 
@@ -930,26 +1054,31 @@ class Conflict(StateGroup):
     @transition
     def us_strikes_production(self):
         if self.iran.production_capacity < 0.001:
-            return 0.0, lambda: None
+            return 0.0, _NOOP
 
         interval = self.prior.sample("us.prod_strike_interval", lu(*US_PROD_STRIKE_INTERVAL))
         rate = 1.0 / interval
 
         def effect():
+            # Check SEAD before the strike (bug fix: was using post-strike capacity)
+            sead_thresh = self.prior.sample("us.sead_threshold", lu(*SEAD_THRESHOLD))
+            needs_standoff = self.iran.production_capacity >= sead_thresh
+
             # Multiplicative: destroy a fraction of remaining capacity
             frac_destroyed = self.prior.sample("us.prod_strike_effect", lu(*US_PROD_STRIKE_EFFECT))
             self.iran.production_capacity *= (1 - frac_destroyed)
 
-            # Munitions scale with remaining capacity — less to target = fewer munitions
-            cap = self.iran.production_capacity
-            t_base = self.prior.sample("us.tomahawk_per_prod_strike",
-                lu(*US_TOMAHAWK_PER_PROD_STRIKE))
-            j_base = self.prior.sample("us.jassm_per_prod_strike",
-                lu(*US_JASSM_PER_PROD_STRIKE))
-            t_used = min(t_base * cap, self.us.tomahawks)
-            j_used = min(j_base * cap, self.us.jassm)
-            self.us.tomahawks = max(0, self.us.tomahawks - t_used)
-            self.us.jassm = max(0, self.us.jassm - j_used)
+            # OSINT: after SEAD complete, gravity bombs — no standoff cost
+            if needs_standoff:
+                cap = self.iran.production_capacity
+                t_base = self.prior.sample("us.tomahawk_per_prod_strike",
+                    lu(*US_TOMAHAWK_PER_PROD_STRIKE))
+                j_base = self.prior.sample("us.jassm_per_prod_strike",
+                    lu(*US_JASSM_PER_PROD_STRIKE))
+                t_used = min(t_base * cap, self.us.tomahawks)
+                j_used = min(j_base * cap, self.us.jassm)
+                self.us.tomahawks = max(0, self.us.tomahawks - t_used)
+                self.us.jassm = max(0, self.us.jassm - j_used)
 
         return rate, effect
 

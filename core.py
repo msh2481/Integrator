@@ -50,19 +50,14 @@ class Prior:
         self._dists: dict[str, Any] = {}
 
     def sample(self, name: str, dist) -> float:
-        if name in self._cache:
-            # Verify same distribution type and parameters
-            prev = self._dists[name]
-            if prev.dist.name != dist.dist.name or dist.args != prev.args or dist.kwds != prev.kwds:
-                raise ValueError(
-                    f"Prior '{name}' already sampled with different distribution: "
-                    f"{prev} vs {dist}"
-                )
+        try:
             return self._cache[name]
-        value = dist.rvs(random_state=self._rng)
-        self._cache[name] = float(value)
+        except KeyError:
+            pass
+        value = float(dist.rvs(random_state=self._rng))
+        self._cache[name] = value
         self._dists[name] = dist
-        return self._cache[name]
+        return value
 
     def values(self) -> dict[str, float]:
         return dict(self._cache)
